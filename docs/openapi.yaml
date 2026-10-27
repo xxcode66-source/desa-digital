@@ -1,0 +1,14 @@
+openapi: 3.0.0
+info:
+  title: API Aplikasi Desa Digital
+  version: 1.0.0
+paths:
+  /auth/login:
+    post:
+      summary: Login Warga / Perangkat Desa
+  /letters:
+    post:
+      summary: Pengajuan Surat Baru
+  /pbb/check:
+    post:
+      summary: Cek Tagihan PBB via NOP

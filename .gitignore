@@ -1,0 +1,31 @@
+# ---- Akar monorepo ----
+.DS_Store
+Thumbs.db
+*.zip
+
+# ---- Android (android-app) ----
+android-app/**/build/
+android-app/.gradle/
+android-app/local.properties
+android-app/.idea/
+android-app/*.iml
+android-app/app/.cxx/
+*.apk
+*.aab
+
+# ---- Backend (Laravel) ----
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/storage/logs/*.log
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*.php
+backend/.phpunit.result.cache
+backend/public/hot
+backend/public/storage
+
+# ---- Python tooling ----
+__pycache__/
+*.pyc

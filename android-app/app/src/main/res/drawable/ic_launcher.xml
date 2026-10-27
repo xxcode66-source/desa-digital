@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- Ikon sementara Fase 0: rumah sederhana di atas latar hijau desa. -->
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M0,0h48v48h-48z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,10L10,22h4v14h6v-8h8v8h6V22h4z" />
+</vector>

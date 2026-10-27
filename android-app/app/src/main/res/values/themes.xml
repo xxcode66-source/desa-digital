@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema dasar tanpa ActionBar; styling sesungguhnya lewat Material 3 di Compose. -->
+    <style name="Theme.DesaDigital" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
