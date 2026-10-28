@@ -1,11 +1,13 @@
 openapi: 3.0.3
 info:
   title: API Aplikasi Desa Digital
-  version: 0.1.0-fase0
+  version: 0.2.0-fase1
   description: |
-    Spesifikasi API Fase 0 (fondasi): health check + autentikasi token via Laravel Sanctum.
-    Endpoint fitur bisnis (surat, PBB, UMKM, pengaduan) sengaja BELUM ada di sini —
-    masing-masing menyusul pada fasenya sesuai PEMBANGUNAN.md §8 (aturan satu fase per sesi).
+    Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi): health check, login,
+    registrasi warga dengan NIK + OTP verifikasi nomor HP, profil, logout/logout-all.
+    Verifikasi identitas dilakukan operator di panel Filament (status pending -> verified/rejected).
+    Endpoint fitur bisnis (surat, PBB, UMKM, pengaduan) menyusul pada fasenya masing-masing
+    sesuai PEMBANGUNAN.md §8 (aturan satu fase per sesi).
     Auth: header `Authorization: Bearer <token>` (Sanctum personal access token).
 servers:
   - url: /api
@@ -35,7 +37,7 @@ paths:
     post:
       tags: [Auth]
       summary: Login (nomor HP + password) -> token Sanctum
-      description: Rate-limited 10 request/menit. Registrasi NIK + OTP + verifikasi operator menyusul di Fase 1.
+      description: Rate-limited 10 request/menit. Menolak (403) bila nomor HP belum diverifikasi OTP.
       operationId: login
       requestBody:
         required: true
@@ -62,6 +64,15 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Message' }
+        '403':
+          description: Nomor HP belum diverifikasi (code = phone_unverified)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  code: { type: string, example: phone_unverified }
         '422':
           description: Validasi input gagal
           content:
@@ -69,6 +80,82 @@ paths:
               schema: { $ref: '#/components/schemas/ValidationError' }
         '429':
           description: Terlalu banyak percobaan (throttle)
+
+  /register/otp:
+    post:
+      tags: [Auth]
+      summary: Kirim kode OTP untuk registrasi (verifikasi kepemilikan nomor HP)
+      description: |
+        Rate-limited 5 request/menit. Nomor tidak boleh sudah terdaftar. Kode disimpan
+        ter-hash (TTL 5 menit, maks 5 percobaan). Field `debug_otp` hanya muncul di
+        environment local/testing — JANGAN di produksi.
+      operationId: sendRegisterOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "08123456789" }
+      responses:
+        '200':
+          description: Kode terkirim
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OtpSendResponse' }
+        '422':
+          description: Nomor tidak valid / sudah terdaftar
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '429':
+          description: Terlalu sering mengirim OTP
+
+  /register:
+    post:
+      tags: [Auth]
+      summary: Daftar akun warga baru (NIK + OTP + consent)
+      description: |
+        Rate-limited. Memverifikasi `otp_code` (purpose=register), membuat user dengan
+        status pending + role `warga`, menandai phone_verified_at & consent, lalu memberi
+        token agar warga bisa login & memantau status verifikasinya.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [village_id, nik, name, phone, password, password_confirmation, otp_code, consent]
+              properties:
+                village_id: { type: integer }
+                nik: { type: string, pattern: '^[0-9]{16}$', description: "16 digit, divalidasi strukturnya (NikValid)." }
+                name: { type: string }
+                phone: { type: string }
+                password: { type: string, format: password, minLength: 8 }
+                password_confirmation: { type: string, format: password }
+                rt: { type: string, nullable: true }
+                rw: { type: string, nullable: true }
+                otp_code: { type: string, pattern: '^[0-9]{6}$' }
+                consent: { type: boolean, example: true, description: "Persetujuan penggunaan data (UU PDP)." }
+      responses:
+        '201':
+          description: Pendaftaran berhasil (menunggu verifikasi operator)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+        '422':
+          description: Validasi gagal atau OTP salah/kedaluwarsa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
 
   /me:
     get:
@@ -100,6 +187,21 @@ paths:
         '401':
           description: Tidak terautentikasi
 
+  /logout-all:
+    post:
+      tags: [Auth]
+      summary: Cabut SEMUA token perangkat (logout-all)
+      operationId: logoutAll
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Semua sesi diakhiri
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401':
+          description: Tidak terautentikasi
+
 components:
   securitySchemes:
     bearerAuth:
@@ -119,6 +221,9 @@ components:
         status: { type: string, enum: [pending, verified, rejected] }
         rt: { type: string, nullable: true }
         rw: { type: string, nullable: true }
+        phone_verified_at: { type: string, format: date-time, nullable: true, description: "Nomor HP sudah diverifikasi OTP." }
+        consent_given_at: { type: string, format: date-time, nullable: true }
+        terms_version: { type: string, nullable: true }
         roles:
           type: array
           items: { $ref: '#/components/schemas/Role' }
@@ -127,6 +232,11 @@ components:
       properties:
         name: { type: string, example: "admin" }
         label: { type: string, example: "Administrator Desa" }
+    OtpSendResponse:
+      type: object
+      properties:
+        message: { type: string }
+        debug_otp: { type: string, nullable: true, description: "Hanya di local/testing. Kosong di produksi." }
     Message:
       type: object
       properties:

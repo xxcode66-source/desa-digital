@@ -18,8 +18,12 @@ class User extends Authenticatable implements FilamentUser
     public const STATUS_VERIFIED = 'verified';
     public const STATUS_REJECTED = 'rejected';
 
+    /** Role yang boleh masuk panel operator/admin (Filament). */
+    public const STAFF_ROLES = ['operator', 'kades', 'bendahara_pbb', 'admin'];
+
     protected $fillable = [
         'village_id', 'nik', 'name', 'phone', 'email', 'password', 'status', 'rt', 'rw',
+        'phone_verified_at', 'consent_given_at', 'terms_version',
     ];
 
     protected $hidden = ['password', 'remember_token', 'nik'];
@@ -29,6 +33,8 @@ class User extends Authenticatable implements FilamentUser
         return [
             'password' => 'hashed',
             'village_id' => 'integer',
+            'phone_verified_at' => 'datetime',
+            'consent_given_at' => 'datetime',
         ];
     }
 
@@ -48,9 +54,19 @@ class User extends Authenticatable implements FilamentUser
         return $this->roles->contains('name', $roleName);
     }
 
+    public function hasAnyRole(array $roleNames): bool
+    {
+        return $this->roles->whereIn('name', $roleNames)->isNotEmpty();
+    }
+
     public function isAdmin(): bool
     {
         return $this->hasRole('admin');
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->hasAnyRole(self::STAFF_ROLES);
     }
 
     public function isVerified(): bool
@@ -58,10 +74,26 @@ class User extends Authenticatable implements FilamentUser
         return $this->status === self::STATUS_VERIFIED;
     }
 
+    public function isPhoneVerified(): bool
+    {
+        return $this->phone_verified_at !== null;
+    }
+
+    /** Beri role (idempotent) — dipakai saat registrasi & verifikasi operator. */
+    public function assignRole(string $roleName, ?string $scopeRt = null, ?string $scopeRw = null): void
+    {
+        $role = Role::firstOrCreate(['name' => $roleName]);
+        $this->roles()->syncWithoutDetaching([
+            $role->id => ['scope_rt' => $scopeRt, 'scope_rw' => $scopeRw],
+        ]);
+        $this->unsetRelation('roles');
+    }
+
     // Fase 0: panel Filament sudah bisa diakses (base). Pembatasan peran/RBAC
     // yang sebenarnya (operator vs admin, verifikasi) baru diimplement Fase 1.
     public function canAccessPanel(Panel $panel): bool
     {
-        return true;
+        // Hanya role staff yang boleh masuk panel; warga biasa tidak.
+        return $this->isStaff();
     }
 }

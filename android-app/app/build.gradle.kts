@@ -16,7 +16,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "0.1.0-fase0"
+        versionName = "0.2.0-fase1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -87,6 +87,11 @@ dependencies {
 
     // Coil (gambar)
     implementation(libs.coil.compose)
+
+    // Keamanan lokal Fase 1: PIN terenkripsi + pemindai biometrik.
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.fragment)
 
     // Test
     testImplementation(libs.junit)

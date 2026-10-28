@@ -22,6 +22,9 @@ kotlinxSerialization = "1.7.3"
 coil = "2.7.0"
 coroutines = "1.9.0"
 coreKtx = "1.13.1"
+biometric = "1.1.0"
+securityCrypto = "1.1.0-alpha06"
+fragment = "1.8.5"
 junit = "4.13.2"
 androidxJunit = "1.2.1"
 espresso = "3.6.1"
@@ -60,6 +63,11 @@ okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor" 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
+# Keamanan lokal Fase 1: PIN (EncryptedSharedPreferences) + biometrik.
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+androidx-fragment = { group = "androidx.fragment", name = "fragment-ktx", version.ref = "fragment" }
 
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 

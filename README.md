@@ -6,8 +6,9 @@ Laravel** dengan panel operator/admin. Prinsip inti & aturan fase (Fase 0–6,
 RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 [`PEMBANGUNAN.md`](PEMBANGUNAN.md) — baca file itu terlebih dahulu.
 
-> Status: **Fase 0 (Setup) TUNTAS.** Fondasi nyata: backend buildable + panel admin
-> Filament terpasang, Android menghasilkan APK, ada CI, ERD, API spec, & panduan desain.
+> Status: **Fase 0 (Setup) & Fase 1 (Auth & Verifikasi) selesai.** Backend buildable +
+> panel Filament dengan verifikasi warga, Android menghasilkan APK (onboarding, registrasi
+> NIK+OTP, profil/status, kunci PIN/biometrik), CI, ERD, API spec, & panduan desain.
 
 ## Struktur
 
@@ -44,6 +45,26 @@ desa-digital/
   kotlinx.serialization, Room, WorkManager, Coil.
 - Package per fitur: `feature/auth`, `feature/home`, `core/{theme,network,data,di,database,work,ui}`.
 - `:app:assembleDebug` menghasilkan `app-debug.apk`.
+
+## Fase 1 yang sudah nyata (Auth & Verifikasi)
+
+### Backend
+- Aturan `NikValid` (struktur NIK 16 digit), `OtpService` + migrasi `otp_codes`
+  (kode ter-hash, TTL 5 mnt, maks 5 percobaan), migrasi `add_auth_fields_to_users`
+  (`phone_verified_at`, `consent_given_at`, `terms_version`).
+- API: `POST /api/register/otp`, `POST /api/register` (status `pending` + role `warga`),
+  `POST /api/logout-all`; login kini menolak (403) bila nomor belum terverifikasi OTP.
+- RBAC nyata: `UserPolicy` (verify/reject/manageRoles/update, semua scoped `village_id`)
+  & `VillagePolicy`. Rate limiting tiap endpoint sensitif (config `desa.php`).
+- **33 test phpunit hijau** (NIK unit, register/OTP feature, RBAC Gate, + Fase 0).
+- Filament: `UserResource` "Verifikasi Warga" — list multi-tenant (khusus desa operator),
+  badge status, aksi **Setujui/Tolak** (ter-audit), edit role khusus kades/admin.
+
+### Android
+- Alur lengkap: onboarding → registrasi (form + OTP dua fase) → login → **buat PIN** →
+  beranda (banner status verifikasi) → profil & logout (semua perangkat).
+- Kunci lokal Fase 1: `PinManager` (PIN 6 digit, hash PBKDF2 di `EncryptedSharedPreferences`)
+  + `BiometricHelper` (sidik jari/credentials via `androidx.biometric`).
 
 ## Reference fase berikutnya (JANGAN dibangun sekarang)
 Skeleton fitur lama dipindah ke folder *reference* agar aturan satu-fase-per-sesi

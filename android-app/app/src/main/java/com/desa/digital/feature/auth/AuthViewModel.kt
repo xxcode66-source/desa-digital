@@ -18,8 +18,8 @@ sealed interface AuthUiState {
 }
 
 /**
- * ViewModel login fondasi (Fase 0). Onboarding, OTP, PIN/biometrik, dan verifikasi
- * akun dibangun penuh pada Fase 1 sesuai PEMBANGUNAN.md bagian 4.1.
+ * ViewModel login (Fase 0) — tetap dipakai Fase 1. Onboarding/registrasi memakai
+ * RegisterViewModel; profil/status memakai ProfileViewModel.
  */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -28,6 +28,10 @@ class AuthViewModel @Inject constructor(
 
     private val _state = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
+
+    fun consumeState() {
+        if (_state.value is AuthUiState.Success) _state.value = AuthUiState.Idle
+    }
 
     fun login(phone: String, password: String) {
         if (phone.isBlank() || password.isBlank()) {
@@ -39,7 +43,7 @@ class AuthViewModel @Inject constructor(
             _state.value = repository.login(phone, password)
                 .fold(
                     onSuccess = { AuthUiState.Success(it.name) },
-                    onFailure = { AuthUiState.Error("Gagal masuk. Periksa koneksi & data kamu.") },
+                    onFailure = { AuthUiState.Error(it.message ?: "Gagal masuk. Periksa koneksi & data kamu.") },
                 )
         }
     }

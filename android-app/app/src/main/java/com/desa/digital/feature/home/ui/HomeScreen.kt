@@ -5,20 +5,52 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.desa.digital.feature.profile.ProfileUiState
+import com.desa.digital.feature.profile.ProfileViewModel
 
 /**
- * Beranda Fase 0: kerangka dengan menu besar berikon (PEMBANGUNAN.md bagian 6).
- * Item Surat/PBB/UMKM/Pengaduan sengaja ditampilkan non-aktif — layarnya baru
- * dibangun pada Fase 2-5, sesuai aturan satu fase per sesi.
+ * Beranda Fase 1: sambutan + ringkas status verifikasi, menu besar berikon (PEMBANGUNAN.md §6).
+ * Item Surat/PBB/UMKM/Pengaduan sengaja non-aktif — layarnya dibangun pada Fase 2-5
+ * (aturan satu fase per sesi).
  */
 @Composable
-fun HomeScreen(userName: String = "Warga") {
+fun HomeScreen(
+    onOpenProfile: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsState()
+    val userName = (state as? ProfileUiState.Loaded)?.user?.name ?: "Warga"
+    val status = (state as? ProfileUiState.Loaded)?.user?.status
+
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(24.dp)) {
-            Text("Halo, $userName", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(4.dp))
-            Text("Selamat datang di Desa Digital.", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(24.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("Halo, $userName", style = MaterialTheme.typography.headlineMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Selamat datang di Desa Digital.", style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            val banner = when (status) {
+                "verified" -> "Akun terverifikasi"
+                "rejected" -> "Verifikasi ditolak — hubungi kantor desa"
+                "pending" -> "Menunggu verifikasi operator"
+                else -> null
+            }
+            if (banner != null) {
+                val container = when (status) {
+                    "verified" -> MaterialTheme.colorScheme.secondaryContainer
+                    "rejected" -> MaterialTheme.colorScheme.errorContainer
+                    else -> MaterialTheme.colorScheme.tertiaryContainer
+                }
+                Surface(color = container, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                    Text(banner, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(12.dp))
+                }
+                Spacer(Modifier.height(20.dp))
+            }
 
             val menus = listOf(
                 "Ajukan Surat" to false,
@@ -33,6 +65,11 @@ fun HomeScreen(userName: String = "Warga") {
                     modifier = Modifier.fillMaxWidth().height(64.dp),
                 ) { Text(label, style = MaterialTheme.typography.labelLarge) }
                 Spacer(Modifier.height(12.dp))
+            }
+
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onOpenProfile, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                Text("Profil & Status Verifikasi")
             }
         }
     }
