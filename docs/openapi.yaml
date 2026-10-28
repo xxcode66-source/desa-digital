@@ -1,10 +1,10 @@
 openapi: 3.0.3
 info:
   title: API Aplikasi Desa Digital
-  version: 0.5.0-fase4
+  version: 0.6.0-fase5
   description: |
     Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi) + Fase 2 (Surat) +
-    Fase 3 (Pengaduan) + Fase 4 (PBB): health check, login, registrasi warga dengan NIK + consent (tanpa
+    Fase 3 (Pengaduan) + Fase 4 (PBB) + Fase 5 (Marketplace UMKM): health check, login, registrasi warga dengan NIK + consent (tanpa
     OTP/SMS pihak ketiga), profil, logout/logout-all, layanan surat dinamis (jenis surat
     berbasis form_schema, pengajuan multipart + lampiran, lacak status, perbaikan per-field),
     verifikasi keaslian surat publik via QR, pengaduan warga (kategori baku, foto bukti +
@@ -15,8 +15,13 @@ info:
     klaim, impor database PBB, serta ACC setoran (termasuk ACC sebagian per item) dilakukan
     staff lewat panel Filament, bukan via API warga. PENTING: tidak ada pembayaran di dalam
     aplikasi — status `lunas` adalah verifikasi internal desa, bukan bukti pelunasan resmi.
-    Endpoint fitur bisnis lainnya (UMKM) menyusul pada fasenya sesuai PEMBANGUNAN.md §8
-    (aturan satu fase per sesi).
+    Fase 5 (UMKM): marketplace toko & produk desa — jelajah/cari/saring (kategori, terbaru,
+    terpopuler, terdekat dari RT), detail toko & produk dengan tombol "Chat WhatsApp" (tautan
+    wa.me + pesan otomatis dibangun server), laporan produk/toko untuk moderasi petugas,
+    pendaftaran & verifikasi toko oleh operator, serta katalog produk (CRUD + foto, maks 5).
+    PENTING: tidak ada keranjang atau pembayaran di aplikasi — transaksi disepakati langsung
+    antara pembeli dan penjual di luar aplikasi. Ulasan/penilaian menyusul pada fase berikutnya
+    sesuai PEMBANGUNAN.md §8 (aturan satu fase per sesi).
     Auth: header `Authorization: Bearer <token>` (Sanctum personal access token).
 servers:
   - url: /api
@@ -28,6 +33,7 @@ tags:
   - name: Letters
   - name: Complaints
   - name: Pbb
+  - name: Umkm
   - name: Public
 
 paths:
@@ -857,6 +863,353 @@ paths:
         '401':
           description: Tidak terautentikasi
 
+  # ---- Fase 5: Marketplace UMKM ----
+  /umkm/categories:
+    get:
+      tags: [Umkm]
+      summary: Daftar kategori usaha baku (config desa) untuk filter & formulir toko
+      operationId: umkmCategories
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Kategori usaha
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/UmkmCategory' }
+        '401':
+          description: Tidak terautentikasi
+
+  /umkm/shops:
+    get:
+      tags: [Umkm]
+      summary: Jelajahi marketplace — toko aktif & tidak disembunyikan di desa warga
+      description: Dibatasi (throttle umkm_browse). Hanya toko status aktif & tidak tersembunyi pada desa pemohon.
+      operationId: umkmBrowse
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: "Cari nama/deskripsi toko." }
+        - { name: category, in: query, schema: { type: string }, description: "Saring kategori (kode)." }
+        - { name: sort, in: query, schema: { type: string, enum: [baru, populer, terdekat], default: baru } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+      responses:
+        '200':
+          description: Daftar toko berpaginasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/UmkmShopCard' }
+                  meta: { $ref: '#/components/schemas/UmkmMeta' }
+        '401':
+          description: Tidak terautentikasi
+        '429':
+          description: Terlalu sering
+
+  /umkm/shops/{shop}:
+    get:
+      tags: [Umkm]
+      summary: Detail satu toko + katalog produk + tautan WhatsApp (mencatat "dilihat")
+      operationId: umkmShopDetail
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: shop, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Detail toko
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/UmkmShopDetail' }
+        '403':
+          description: Toko tidak boleh dilihat (non-aktif/tersembunyi & bukan pemilik/petugas)
+        '404':
+          description: Tidak ditemukan
+
+  /umkm/shops/{shop}/photo:
+    get:
+      tags: [Umkm]
+      summary: Unduh foto toko (disk privat; hanya yang boleh melihat toko)
+      operationId: umkmShopPhoto
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: shop, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Biner gambar
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403':
+          description: Tidak diizinkan
+        '404':
+          description: Foto tidak ada
+
+  /umkm/shops/{shop}/wa:
+    get:
+      tags: [Umkm]
+      summary: Klik "Chat WhatsApp" — catat statistik & kembalikan tautan wa.me (pesan otomatis)
+      operationId: umkmShopWa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: shop, in: path, required: true, schema: { type: integer } }
+        - { name: product, in: query, schema: { type: integer }, description: "Bila diisi, pesan menyebut produk ini." }
+      responses:
+        '200':
+          description: Tautan WhatsApp
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      wa_url: { type: string, example: "https://wa.me/62812...?text=Halo..." }
+        '403':
+          description: Tidak diizinkan
+
+  /umkm/products/{product}:
+    get:
+      tags: [Umkm]
+      summary: Detail satu produk + foto + tautan WhatsApp (mencatat "dilihat" toko)
+      operationId: umkmProductDetail
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: product, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Detail produk
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/UmkmProduct' }
+        '403':
+          description: Produk tidak boleh dilihat (tokonya tidak tampil publik & bukan pemilik)
+        '404':
+          description: Tidak ditemukan
+    put:
+      tags: [Umkm]
+      summary: Ubah produk (kirim photos[] untuk mengganti seluruh foto; kosongkan untuk pertahankan)
+      operationId: umkmUpdateProduct
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: product, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UmkmProductForm'
+      responses:
+        '200':
+          description: Produk diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/UmkmProduct' }
+        '403':
+          description: Bukan pemilik produk
+    delete:
+      tags: [Umkm]
+      summary: Hapus produk beserta fotonya (hanya pemilik toko)
+      operationId: umkmDeleteProduct
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: product, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Produk dihapus
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '403':
+          description: Bukan pemilik produk
+
+  /umkm/products/{product}/photos/{photo}:
+    get:
+      tags: [Umkm]
+      summary: Unduh foto produk (disk privat; hanya yang boleh melihat produk)
+      operationId: umkmProductPhoto
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: product, in: path, required: true, schema: { type: integer } }
+        - { name: photo, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Biner gambar
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403':
+          description: Tidak diizinkan
+        '404':
+          description: Foto tidak ada
+
+  /umkm/shops/{shop}/reports:
+    post:
+      tags: [Umkm]
+      summary: Lapor satu toko untuk moderasi petugas (butuh akun terverifikasi)
+      description: Dibatasi (throttle umkm_report).
+      operationId: umkmReportShop
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: shop, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 1000 }
+      responses:
+        '201':
+          description: Laporan terkirim
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '403':
+          description: Belum terverifikasi / desa berbeda
+        '429':
+          description: Terlalu sering
+
+  /umkm/products/{product}/reports:
+    post:
+      tags: [Umkm]
+      summary: Lapor satu produk untuk moderasi petugas (butuh akun terverifikasi)
+      operationId: umkmReportProduct
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: product, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 1000 }
+      responses:
+        '201':
+          description: Laporan terkirim
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '403':
+          description: Belum terverifikasi / desa berbeda
+        '429':
+          description: Terlalu sering
+
+  /umkm/my-shop:
+    get:
+      tags: [Umkm]
+      summary: Toko milik pelaku yang login (status apa pun) + produk + statistik penjual
+      operationId: umkmMyShop
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Toko sendiri, atau data null bila belum mendaftar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { oneOf: [ { $ref: '#/components/schemas/UmkmMyShop' }, { type: "null" } ] }
+        '401':
+          description: Tidak terautentikasi
+    post:
+      tags: [Umkm]
+      summary: Daftarkan toko baru (menunggu verifikasi petugas)
+      operationId: umkmCreateShop
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UmkmShopForm'
+      responses:
+        '201':
+          description: Toko terdaftar, menunggu verifikasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/UmkmMyShop' }
+        '403':
+          description: Belum terverifikasi
+        '422':
+          description: Validasi gagal
+    put:
+      tags: [Umkm]
+      summary: Perbarui toko sendiri (toko berstatus ditolak otomatis diajukan ulang)
+      operationId: umkmUpdateShop
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UmkmShopForm'
+      responses:
+        '200':
+          description: Perubahan tersimpan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/UmkmMyShop' }
+        '403':
+          description: Bukan pemilik toko
+
+  /umkm/products:
+    post:
+      tags: [Umkm]
+      summary: Tambah produk ke katalog toko sendiri (multipart, maks 5 foto)
+      operationId: umkmStoreProduct
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UmkmProductForm'
+      responses:
+        '201':
+          description: Produk ditambahkan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/UmkmProduct' }
+        '403':
+          description: Bukan pemilik / belum punya toko
+        '422':
+          description: Validasi gagal
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1174,3 +1527,107 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/PbbDepositItem' }
+
+    # ---- Fase 5: UMKM ----
+    UmkmCategory:
+      type: object
+      properties:
+        code: { type: string, example: "makanan" }
+        label: { type: string, example: "Makanan" }
+    UmkmMeta:
+      type: object
+      properties:
+        total: { type: integer }
+        page: { type: integer }
+    UmkmProductPhoto:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, nullable: true }
+        download_url: { type: string, nullable: true, example: "/api/umkm/products/1/photos/2", description: "Perlindungan disk privat — perlu header login untuk mengunduh." }
+    UmkmProduct:
+      type: object
+      description: "Produk UMKM. `photos` & `wa_url` hanya terisi pada respons detail produk."
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        price: { type: number }
+        price_label: { type: string, example: "Rp 15.000" }
+        is_available: { type: boolean, description: "Ketersediaan stok; bukan keranjang/pembayaran." }
+        shop_id: { type: integer, nullable: true }
+        shop_name: { type: string, nullable: true }
+        photo_url: { type: string, nullable: true }
+        photos:
+          type: array
+          items: { $ref: '#/components/schemas/UmkmProductPhoto' }
+        wa_url: { type: string, nullable: true, description: "Hanya pada detail; jembatan ke penjual, transaksi offline." }
+    UmkmShopStats:
+      type: object
+      description: "Statistik penjual (hanya pada 'toko saya')."
+      properties:
+        views_count: { type: integer }
+        wa_clicks_count: { type: integer }
+    UmkmShopCard:
+      type: object
+      description: "Ringkasan toko utk kartu marketplace."
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        category: { type: string }
+        category_label: { type: string }
+        description: { type: string, nullable: true }
+        rt: { type: string, nullable: true }
+        rw: { type: string, nullable: true }
+        opening_hours: { type: string, nullable: true }
+        products_count: { type: integer }
+        photo_url: { type: string, nullable: true }
+    UmkmShopDetail:
+      type: object
+      description: "Detail toko — menambahkan produk, alamat, status & tautan WhatsApp."
+      allOf:
+        - { $ref: '#/components/schemas/UmkmShopCard' }
+      properties:
+        address: { type: string, nullable: true }
+        status: { type: string, enum: [pending, aktif, ditolak, nonaktif] }
+        status_label: { type: string }
+        wa_url: { type: string, description: "Tautan wa.me tingkat toko (pesan menyebut nama toko)." }
+        products:
+          type: array
+          items: { $ref: '#/components/schemas/UmkmProduct' }
+    UmkmMyShop:
+      type: object
+      description: "'Toko saya' — detail toko + visibilitas, catatan review & statistik penjual."
+      allOf:
+        - { $ref: '#/components/schemas/UmkmShopDetail' }
+      properties:
+        is_hidden: { type: boolean, description: "true bila petugas menyembunyikan toko dari marketplace." }
+        review_note: { type: string, nullable: true, description: "Catatan/alasan dari petugas (mis. saat menolak)." }
+        stats: { $ref: '#/components/schemas/UmkmShopStats' }
+    UmkmShopForm:
+      type: object
+      description: "Muatan formulir daftar/ubah toko (multipart). `photo` satu gambar opsional."
+      required: [name, category, wa_number]
+      properties:
+        name: { type: string, maxLength: 120 }
+        description: { type: string, nullable: true, maxLength: 2000 }
+        category: { type: string, enum: [makanan, minuman, jasa, kerajinan, pertanian, lainnya] }
+        address: { type: string, nullable: true, maxLength: 255 }
+        rt: { type: string, nullable: true, maxLength: 5 }
+        rw: { type: string, nullable: true, maxLength: 5 }
+        opening_hours: { type: string, nullable: true, maxLength: 120 }
+        wa_number: { type: string, maxLength: 20, description: "08xx / 628xx; dinormalisasi server ke format internasional." }
+        photo: { type: string, format: binary, nullable: true }
+    UmkmProductForm:
+      type: object
+      description: "Muatan formulir produk (multipart). `photos[]` gambar, maks 5."
+      required: [name, price]
+      properties:
+        name: { type: string, maxLength: 120 }
+        description: { type: string, nullable: true, maxLength: 2000 }
+        price: { type: number, minimum: 0 }
+        is_available: { type: boolean }
+        photos:
+          type: array
+          maxItems: 5
+          items: { type: string, format: binary }

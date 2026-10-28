@@ -70,6 +70,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(PbbDepositBatch::class, 'collector_id');
     }
 
+    /** Toko UMKM yang dimiliki warga ini (Fase 5). */
+    public function shop(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Shop::class);
+    }
+
     /** Apakah user ini petugas pemungut PBB (RT atau kolektor). */
     public function isCollector(): bool
     {

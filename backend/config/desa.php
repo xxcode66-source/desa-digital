@@ -14,6 +14,8 @@ return [
         'complaint_browse' => (int) env('DESA_THROTTLE_COMPLAINT_BROWSE', 30),
         'pbb_nop_check' => (int) env('DESA_THROTTLE_PBB_NOP_CHECK', 10),
         'pbb_deposit_submit' => (int) env('DESA_THROTTLE_PBB_DEPOSIT_SUBMIT', 12),
+        'umkm_browse' => (int) env('DESA_THROTTLE_UMKM_BROWSE', 60),
+        'umkm_report' => (int) env('DESA_THROTTLE_UMKM_REPORT', 10),
     ],
 
     // Modul Surat (Fase 2, PEMBANGUNAN.md 4.2).
@@ -48,5 +50,22 @@ return [
         'pending_reminder_days' => (int) env('DESA_PBB_PENDING_REMINDER_DAYS', 7), // setoran pending > N hari -> pengingat
         // Lebar kolom nop di DB; input cek NOP dibersihkan & dibatasi sebatas ini.
         'nop_max_len' => 18,
+    ],
+
+    // Modul Marketplace UMKM (Fase 5, PEMBANGUNAN.md 4.4). TANPA keranjang/pembayaran —
+    // katalog + jembatan chat WhatsApp; transaksi & harga disepakati offline.
+    'umkm' => [
+        'max_photo_kb' => (int) env('DESA_UMKM_MAX_PHOTO_KB', 3072), // foto toko/produk (±3 MB)
+        'max_product_photos' => 5,
+        'allowed_mime' => ['image/jpeg', 'image/png', 'image/webp'], // katalog = foto, bukan PDF
+        // Kategori usaha baku (code => label) — ditetapkan desa agar filter & pencarian konsisten.
+        'categories' => [
+            'makanan' => 'Makanan',
+            'minuman' => 'Minuman',
+            'jasa' => 'Jasa',
+            'kerajinan' => 'Kerajinan / Tangan',
+            'pertanian' => 'Pertanian',
+            'lainnya' => 'Lainnya',
+        ],
     ],
 ];

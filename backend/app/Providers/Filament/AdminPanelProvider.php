@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Widgets\PbbStatsWidget;
+use App\Filament\Widgets\UmkmStatsWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -40,6 +41,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 AccountWidget::class,
                 PbbStatsWidget::class,
+                UmkmStatsWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

@@ -27,6 +27,13 @@ import com.desa.digital.feature.pbb.ui.DepositScreen
 import com.desa.digital.feature.pbb.ui.MyNopScreen
 import com.desa.digital.feature.pbb.ui.PbbMenuScreen
 import com.desa.digital.feature.profile.ui.ProfileScreen
+import com.desa.digital.feature.umkm.ui.MarketplaceScreen
+import com.desa.digital.feature.umkm.ui.MyShopScreen
+import com.desa.digital.feature.umkm.ui.ProductDetailScreen
+import com.desa.digital.feature.umkm.ui.ProductFormScreen
+import com.desa.digital.feature.umkm.ui.ShopDetailScreen
+import com.desa.digital.feature.umkm.ui.ShopFormScreen
+import com.desa.digital.feature.umkm.ui.UmkmMenuScreen
 import com.desa.digital.core.session.SessionViewModel.Companion.CREATE_PIN
 import com.desa.digital.core.session.SessionViewModel.Companion.HOME
 import com.desa.digital.core.session.SessionViewModel.Companion.LOCK
@@ -54,8 +61,20 @@ const val PBB_CLAIM_NEW = "pbb/claims/new"
 const val PBB_CLAIMS = "pbb/claims"
 const val PBB_DEPOSIT = "pbb/deposit"
 
+/** Rute modul Marketplace UMKM Fase 5. */
+const val UMKM = "umkm"
+const val UMKM_MARKET = "umkm/market"
+const val UMKM_SHOP_DETAIL = "umkm/shops/{shopId}"
+const val UMKM_PRODUCT_DETAIL = "umkm/products/{productId}"
+const val UMKM_MYSHOP = "umkm/my-shop"
+const val UMKM_SHOP_FORM = "umkm/shop-form"
+const val UMKM_PRODUCT_NEW = "umkm/products/new"
+const val UMKM_PRODUCT_EDIT = "umkm/products/{productId}/edit"
+
 private fun letterIdArg() = navArgument("letterId") { type = NavType.LongType }
 private fun complaintIdArg() = navArgument("complaintId") { type = NavType.LongType }
+private fun shopIdArg() = navArgument("shopId") { type = NavType.LongType }
+private fun productIdArg() = navArgument("productId") { type = NavType.LongType }
 
 /**
  * Grafik navigasi Fase 1+2: onboarding -> (login|register) -> buat PIN -> beranda -> profil,
@@ -108,6 +127,7 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 onOpenLetters = { navController.navigate(LETTERS) },
                 onOpenComplaints = { navController.navigate(COMPLAINTS) },
                 onOpenPbb = { navController.navigate(PBB) },
+                onOpenUmkm = { navController.navigate(UMKM) },
             )
         }
         composable(PROFILE) {
@@ -214,6 +234,58 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
         }
         composable(PBB_DEPOSIT) {
             DepositScreen(onBack = { navController.popBackStack() })
+        }
+
+        // ---- Fase 5: Marketplace UMKM ----
+        composable(UMKM) {
+            UmkmMenuScreen(
+                onBack = { navController.popBackStack() },
+                onBrowse = { navController.navigate(UMKM_MARKET) },
+                onMyShop = { navController.navigate(UMKM_MYSHOP) },
+            )
+        }
+        composable(UMKM_MARKET) {
+            MarketplaceScreen(
+                onBack = { navController.popBackStack() },
+                onOpenShop = { id -> navController.navigate("umkm/shops/$id") },
+            )
+        }
+        composable(UMKM_SHOP_DETAIL, arguments = listOf(shopIdArg())) { entry ->
+            ShopDetailScreen(
+                shopId = entry.arguments?.getLong("shopId") ?: 0L,
+                onBack = { navController.popBackStack() },
+                onOpenProduct = { id -> navController.navigate("umkm/products/$id") },
+            )
+        }
+        composable(UMKM_PRODUCT_DETAIL, arguments = listOf(productIdArg())) { entry ->
+            ProductDetailScreen(
+                productId = entry.arguments?.getLong("productId") ?: 0L,
+                onBack = { navController.popBackStack() },
+                onOpenShop = { id -> navController.navigate("umkm/shops/$id") },
+            )
+        }
+        composable(UMKM_MYSHOP) {
+            MyShopScreen(
+                onBack = { navController.popBackStack() },
+                onEditShop = { navController.navigate(UMKM_SHOP_FORM) },
+                onAddProduct = { navController.navigate(UMKM_PRODUCT_NEW) },
+                onEditProduct = { id -> navController.navigate("umkm/products/$id/edit") },
+            )
+        }
+        composable(UMKM_SHOP_FORM) {
+            ShopFormScreen(onBack = { navController.popBackStack() })
+        }
+        composable(UMKM_PRODUCT_NEW) {
+            ProductFormScreen(
+                productId = null,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(UMKM_PRODUCT_EDIT, arguments = listOf(productIdArg())) { entry ->
+            ProductFormScreen(
+                productId = entry.arguments?.getLong("productId"),
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

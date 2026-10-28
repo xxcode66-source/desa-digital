@@ -1,25 +1,22 @@
 # Referensi Fase Mendatang — Android (BUKAN kode aktif)
 
-Stub Compose/ViewModel untuk modul **umkm (Fase 5)** dipindah ke sini dari
-`app/src/main/java/com/desa/digital/feature/` agar:
+Stub Compose/ViewModel untuk fitur yang belum waktunya dibangun dulu dipindah ke sini
+dari `app/src/main/java/com/desa/digital/feature/` agar source set yang di-compile hanya
+berisi fitur fase yang sudah dibangun (menjunjung aturan **satu fase per sesi**,
+PEMBANGUNAN.md bagian 8).
 
-- source set yang di-compile hanya berisi fitur fase yang sudah dibangun
-  (Fase 0–4: auth, home, lock, profile, letter, complaint, pbb);
-- tidak ada referensi ke layar/rute fitur yang belum seharusnya dibangun
-  (menjunjung aturan **satu fase per sesi**, PEMBANGUNAN.md bagian 8).
+## Status: TIDAK ADA stub tersisa
 
-## Pemetaan fase
-| Folder | Fase |
-|---|---|
-| `umkm/` | Fase 5 — Marketplace UMKM |
+Stub `letter/` (Fase 2), `complaint/` (Fase 3), `pbb/` (Fase 4), & `umkm/` (Fase 5) telah
+**dihapus** — implementasi aslinya sudah hidup di:
+- `feature/letter/` — wizard dinamis dari `form_schema_json`, lacak status, perbaikan;
+- `feature/complaint/` — formulir + foto + anonim, lacak & balasan;
+- `feature/pbb/` — cek NOP, klaim + bukti foto, "NOP saya" & tunggakan, slip setoran RT/kolektor;
+- `feature/umkm/` — marketplace (cari/sortir), detail toko/produk + tombol Chat WhatsApp,
+  "Toko Saya" + CRUD produk (foto maks 5), lapor produk/toko.
 
-> Stub `letter/` (Fase 2), `complaint/` (Fase 3), & `pbb/` (Fase 4) telah **dihapus** —
-> implementasi aslinya sudah hidup di `feature/letter/` (wizard dinamis, lacak status,
-> perbaikan), `feature/complaint/` (formulir + foto + anonim, lacak & balasan), dan
-> `feature/pbb/` (cek NOP, klaim + bukti foto, "NOP saya" & tunggakan, slip setoran
-> RT/kolektor) sesuai PEMBANGUNAN.md 4.2, 4.5, & 4.3.
+> **Fase 6 & seterusnya** belum punya stub — dibangun langsung di `feature/` saat fasenya
+> resmi dimulai, mengikuti spesifikasi PEMBANGUNAN.md bagian 4 & Definition of Done bagian 12.
 
-## Cara memakai
-Saat fasenya dimulai, pindahkan folder kembali ke `feature/`, lalu **tulis ulang**
-mengikuti spesifikasi bagian 4 PEMBANGUNAN.md (wizard form, upload+kompres, offline
-queue, notifikasi FCM, dsb). Stub lama tidak memenuhi Definition of Done (bagian 12).
+Folder ini dipertahankan hanya sebagai catatan historis; tambahkan stub baru ke sini bila
+kelak ada kerangka fitur yang perlu "diparkir" di luar source set aktif.

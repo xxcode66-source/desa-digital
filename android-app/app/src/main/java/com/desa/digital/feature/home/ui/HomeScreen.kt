@@ -10,9 +10,8 @@ import com.desa.digital.feature.profile.ProfileUiState
 import com.desa.digital.feature.profile.ProfileViewModel
 
 /**
- * Beranda Fase 1+2+3: sambutan + ringkas status verifikasi, menu besar berikon (PEMBANGUNAN.md §6).
- * Surat (Fase 2) & Pengaduan (Fase 3) aktif; PBB/UMKM sengaja non-aktif — dibangun pada Fase 4-5
- * (aturan satu fase per sesi).
+ * Beranda Fase 1+2+3+4+5: sambutan + ringkas status verifikasi, menu besar berikon (PEMBANGUNAN.md §6).
+ * Surat (Fase 2), Pengaduan (Fase 3), PBB (Fase 4) & Pasar UMKM (Fase 5) aktif.
  */
 @Composable
 fun HomeScreen(
@@ -20,6 +19,7 @@ fun HomeScreen(
     onOpenLetters: () -> Unit = {},
     onOpenComplaints: () -> Unit = {},
     onOpenPbb: () -> Unit = {},
+    onOpenUmkm: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -58,7 +58,7 @@ fun HomeScreen(
             val menus = listOf(
                 "Ajukan Surat" to true,
                 "PBB / Cek NOP" to true,
-                "Pasar UMKM" to false,
+                "Pasar UMKM" to true,
                 "Pengaduan" to true,
             )
             menus.forEach { (label, enabled) ->
@@ -67,6 +67,7 @@ fun HomeScreen(
                         when (label) {
                             "Ajukan Surat" -> onOpenLetters()
                             "PBB / Cek NOP" -> onOpenPbb()
+                            "Pasar UMKM" -> onOpenUmkm()
                             "Pengaduan" -> onOpenComplaints()
                         }
                     },

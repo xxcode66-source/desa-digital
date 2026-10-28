@@ -18,10 +18,20 @@ import com.desa.digital.core.network.dto.PbbMyObjectListResponse
 import com.desa.digital.core.network.dto.PbbNopLookupResponse
 import com.desa.digital.core.network.dto.RegisterRequest
 import com.desa.digital.core.network.dto.RegisterResponse
+import com.desa.digital.core.network.dto.UmkmCategoryListResponse
+import com.desa.digital.core.network.dto.UmkmMessageResponse
+import com.desa.digital.core.network.dto.UmkmProductDataResponse
+import com.desa.digital.core.network.dto.UmkmProductDetailResponse
+import com.desa.digital.core.network.dto.UmkmReportRequest
+import com.desa.digital.core.network.dto.UmkmShopDataResponse
+import com.desa.digital.core.network.dto.UmkmShopDetailResponse
+import com.desa.digital.core.network.dto.UmkmShopListResponse
+import com.desa.digital.core.network.dto.UmkmWaResponse
 import com.desa.digital.core.network.dto.UserDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Multipart
@@ -149,4 +159,73 @@ interface ApiService {
 
     @GET("api/my-pbb-deposits")
     suspend fun myPbbDeposits(): PbbDepositBatchListResponse
+
+    // ---- Fase 5: Marketplace UMKM (warga/pembeli) ----
+
+    /** Kategori usaha baku untuk filter marketplace & pengisian formulir toko. */
+    @GET("api/umkm/categories")
+    suspend fun umkmCategories(): UmkmCategoryListResponse
+
+    /** Jelajahi toko aktif di desa: cari [q], saring [category], urutkan [sort] (baru/populer/terdekat). */
+    @GET("api/umkm/shops")
+    suspend fun umkmBrowse(
+        @Query("q") q: String? = null,
+        @Query("category") category: String? = null,
+        @Query("sort") sort: String? = null,
+        @Query("page") page: Int? = null,
+    ): UmkmShopListResponse
+
+    @GET("api/umkm/shops/{id}")
+    suspend fun umkmShopDetail(@Path("id") shopId: Long): UmkmShopDetailResponse
+
+    /** Klik "Chat WhatsApp" pada toko (opsional menyertakan produk) — mencatat statistik. */
+    @GET("api/umkm/shops/{id}/wa")
+    suspend fun umkmShopWa(
+        @Path("id") shopId: Long,
+        @Query("product") productId: Long? = null,
+    ): UmkmWaResponse
+
+    @GET("api/umkm/products/{id}")
+    suspend fun umkmProductDetail(@Path("id") productId: Long): UmkmProductDetailResponse
+
+    /** Lapor toko/produk untuk moderasi petugas desa. */
+    @POST("api/umkm/shops/{id}/reports")
+    suspend fun umkmReportShop(@Path("id") shopId: Long, @Body body: UmkmReportRequest): UmkmMessageResponse
+
+    @POST("api/umkm/products/{id}/reports")
+    suspend fun umkmReportProduct(@Path("id") productId: Long, @Body body: UmkmReportRequest): UmkmMessageResponse
+
+    // ---- Fase 5: UMKM (pelaku — kelola toko & katalog) ----
+
+    /** Toko milik pelaku yang login (status apa pun) + produk + statistik; null bila belum daftar. */
+    @GET("api/umkm/my-shop")
+    suspend fun umkmMyShop(): UmkmShopDetailResponse
+
+    /** Buat/perbarui toko sendiri (multipart + 1 foto opsional pada field "photo"). */
+    @Multipart
+    @POST("api/umkm/my-shop")
+    suspend fun umkmSaveShop(
+        @PartMap parts: Map<String, RequestBody>,
+        @Part photo: MultipartBody.Part? = null,
+    ): UmkmShopDataResponse
+
+    /** Tambah produk ke katalog (multipart, field "photos[]" maks 5). */
+    @Multipart
+    @POST("api/umkm/products")
+    suspend fun umkmStoreProduct(
+        @PartMap parts: Map<String, RequestBody>,
+        @Part photos: List<MultipartBody.Part>,
+    ): UmkmProductDataResponse
+
+    /** Ubah produk; kirim "photos[]" untuk mengganti seluruh foto, kosongkan untuk pertahankan. */
+    @Multipart
+    @PUT("api/umkm/products/{id}")
+    suspend fun umkmUpdateProduct(
+        @Path("id") productId: Long,
+        @PartMap parts: Map<String, RequestBody>,
+        @Part photos: List<MultipartBody.Part>,
+    ): UmkmProductDataResponse
+
+    @DELETE("api/umkm/products/{id}")
+    suspend fun umkmDeleteProduct(@Path("id") productId: Long): UmkmMessageResponse
 }

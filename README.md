@@ -7,15 +7,17 @@ RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 [`PEMBANGUNAN.md`](PEMBANGUNAN.md) — baca file itu terlebih dahulu.
 
 > Status: **Fase 0 (Setup), Fase 1 (Auth & Verifikasi), Fase 2 (Surat / E-Layanan),
-> Fase 3 (Pengaduan), & Fase 4 (PBB) selesai.**
+> Fase 3 (Pengaduan), Fase 4 (PBB), & Fase 5 (Marketplace UMKM) selesai.**
 > Backend buildable + panel Filament (verifikasi warga + antrean surat dinamis + antrean
-> pengaduan + administrasi PBB: impor database, verifikasi klaim, ACC setoran sebagian),
-> Android menghasilkan APK (onboarding, registrasi NIK, PIN/biometrik, wizard surat dari
-> skema, lacak status & perbaikan, formulir pengaduan + foto + lacak & balasan, cek NOP,
-> klaim kepemilikan + foto, "NOP saya" & tunggakan, slip setoran RT/kolektor),
+> pengaduan + administrasi PBB: impor database, verifikasi klaim, ACC setoran sebagian +
+> moderasi UMKM: verifikasi toko, produk, laporan), Android menghasilkan APK (onboarding,
+> registrasi NIK, PIN/biometrik, wizard surat dari skema, lacak status & perbaikan, formulir
+> pengaduan + foto + lacak & balasan, cek NOP, klaim kepemilikan + foto, "NOP saya" &
+> tunggakan, slip setoran RT/kolektor, marketplace UMKM + chat WhatsApp + toko saya),
 > CI, ERD, API spec, & panduan desain.
 > Registrasi **tanpa OTP/SMS berbayar** — verifikasi identitas cukup oleh operator desa.
-> **Tidak ada pembayaran di aplikasi** — status `lunas` PBB hanya verifikasi internal desa.
+> **Tidak ada pembayaran di aplikasi** — status `lunas` PBB hanya verifikasi internal desa;
+> transaksi UMKM tetap offline (WhatsApp hanyalah jembatan ke penjual).
 
 ## Struktur
 
@@ -162,12 +164,48 @@ desa-digital/
 - Rupiah & status dilokalkan; pesan error teknis diterjemahkan ke bahasa warga. Entri Beranda
   ("PBB") — label netral, tanpa kata "bayar" karena tak ada pembayaran in-app.
 
+## Fase 5 yang sudah nyata (Marketplace UMKM)
+
+> **Prinsip: tidak ada keranjang & pembayaran di dalam aplikasi.** Transaksi terjadi
+> offline antara warga dan penjual; tombol **Chat WhatsApp** hanya jembatan ke nomor
+> penjual dengan pesan otomatis terisi.
+
+### Backend
+- Tabel `shops`, `products`, `product_photos`, `product_reports`, `shop_stats`
+  (semua ber-`village_id`; satu toko per pemilik — unik `village_id`+`user_id`).
+- Mesin status `UmkmStatus`: toko `pending → aktif/ditolak`, `aktif → nonaktif`,
+  `nonaktif → aktif`, `ditolak → pending` (ajukan ulang); laporan `baru → ditindak/diabaikan`.
+  Hanya toko `aktif` & tidak disembunyikan yang tampil publik (`isPubliclyVisible`).
+- `UmkmService`: verifikasi (setujui/tolak/nonaktifkan), ajukan ulang oleh pemilik, penanganan
+  laporan (moderasi — bisa sekalian membekukan toko), statistik penjual (dilihat & klik WA),
+  dan pembangunan tautan `wa.me` bernomor internasional (dinormalisasi 0/8 → 62). Semua
+  transisi status ter-audit.
+- API: kategori, **browse** (cari `q`/filter kategori/"terdekat per RT"/sortir baru&populer —
+  discoping ke toko aktif satu desa), detail toko & produk (+catat "dilihat"), **klik WA**
+  (kembalikan `wa_url` +catat statistik), "Toko Saya" (toko + produk + statistik),
+  daftar/edit toko (multipart, foto profil, ajukan ulang bila ditolak), CRUD produk
+  (multipart `photos[]` maks 5, disk privat `local`), lapor produk/toko (throttle
+  `umkm_report`). RBAC via `ShopPolicy`/`ProductPolicy`/`ProductReportPolicy`, throttle
+  `umkm_browse`/`umkm_report`.
+- **197 test phpunit hijau** (unit `UmkmStatus`, service verifikasi/moderasi/statistik/WA-link,
+  policy, API browse/detail+WA/my-shop/CRUD produk/lapor + throttle, smoke panel Filament).
+- Filament: `ShopResource` (verifikasi setujui/tolak/nonaktifkan + sembunyikan),
+  `ProductResource` (moderasi baca-saja), `ProductReportResource` (tangani laporan —
+  ditindak/abaikan, opsi bekukan toko), widget dashboard `UmkmStatsWidget`.
+
+### Android
+- Modul `feature/umkm`: **marketplace** (cari + filter kategori + sortir baru/populer/terdekat RT),
+  detail toko & produk dengan **tombol Chat WhatsApp** (buka `wa.me` terisi), **Toko Saya**
+  (daftar produk + statistik dilihat/klik WA), daftar/edit toko (foto profil), tambah/edit produk
+  (foto maks 5 via photo picker), lapor produk/toko. Entri Beranda ("UMKM").
+
 ## Reference fase berikutnya (JANGAN dibangun sekarang)
-Stub lama fitur yang belum dibangun dipindah ke folder *reference* agar aturan
-satu-fase-per-sesi terjaga; stub yang sudah diimplementasikan dihapus saat fase-nya selesai
-(Surat/Fase 2, Pengaduan/Fase 3, & PBB/Fase 4 sudah dihapus):
-- `backend/reference-future-phases/` → UMKM (Fase 5).
-- `android-app/reference-future-phases/` → stub layar UMKM (Fase 5).
+Stub lama fitur yang belum dibangun dulu disimpan di folder *reference* agar aturan
+satu-fase-per-sesi terjaga. **Seluruh stub Fase 2–5 (Surat, Pengaduan, PBB, UMKM) sudah
+diimplementasikan & dihapus** — tidak ada stub tersisa. Fase 6 & seterusnya akan dibangun
+langsung di jalur aktif saat fasenya resmi dimulai:
+- `backend/reference-future-phases/` → (kosong; hanya README catatan historis).
+- `android-app/reference-future-phases/` → (kosong; hanya README catatan historis).
 
 ## Cara build
 

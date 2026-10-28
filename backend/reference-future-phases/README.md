@@ -1,30 +1,26 @@
 # Referensi Fase Mendatang (BUKAN kode aktif)
 
-Folder ini menampung kerangka (skeleton) fitur yang **sudah ada sebelumnya** tapi
-belum seharusnya dibangun. sesuai aturan **satu fase per sesi** di
-`docs/PEMBANGUNAN.md` (bagian 8), file-file ini sengaja dikeluarkan dari jalur
-aktif (`app/Http/Controllers/Api` dan `database/migrations`) supaya:
+Folder ini dulu menampung kerangka (skeleton) fitur yang **sudah ada sebelumnya** tapi
+belum seharusnya dibangun, sesuai aturan **satu fase per sesi** di
+`docs/PEMBANGUNAN.md` (bagian 8). File-file tersebut sengaja dikeluarkan dari jalur
+aktif (`app/Http/Controllers/Api` dan `database/migrations`) supaya `php artisan migrate`
+pada fase awal tidak membuat tabel fitur yang belum waktunya, dan controller tidak
+ter-daftar ke router.
 
-- `php artisan migrate` pada fase awal **tidak** membuat tabel pbb/umkm/complaints.
-- Controller tidak didaftarkan ke router & tidak autoload (folder ini di luar `app/`).
+## Status: TIDAK ADA stub tersisa
 
-## Pemetaan ke Fase
+Seluruh stub Fase 0–5 sudah **diimplementasikan dan dihapus** dari folder ini:
 
-| File | Modul | Fase (PEMBANGUNAN.md) |
+| Fase | Modul | Implementasi aktif |
 |---|---|---|
-| `Controllers/UmkmController.php` + `migrations/*_create_umkm_tables.php` | Marketplace UMKM | **Fase 5** |
+| Fase 2 | Surat / E-Layanan | `LetterController`, model/service/`LetterStatus`, migrasi `create_letters_tables`, panel Filament |
+| Fase 3 | Pengaduan | `ComplaintController`, `ComplaintStatus`, migrasi `create_complaints_tables`, panel Filament |
+| Fase 4 | PBB / NPD | `PbbController`, `PbbStatus`, `PbbImportService`/`PbbDepositService`, migrasi `create_pbb_tables`, panel Filament |
+| Fase 5 | Marketplace UMKM | `UmkmController`, `Shop`/`Product`/`ProductPhoto`/`ProductReport`/`ShopStats`, `UmkmStatus`/`UmkmService`, `Shop`/`Product`/`ProductReport`Policy, migrasi `create_umkm_tables`, panel Filament |
 
-> Stub Surat (Fase 2), Pengaduan (Fase 3), & PBB (Fase 4) telah **dihapus** — implementasi
-> aslinya sudah hidup: `app/Http/Controllers/Api/Letter*.php` + `Complaint*.php` +
-> `PbbController.php`, model/service/`LetterStatus`/`ComplaintStatus`/`PbbStatus`, migrasi
-> `create_letters_tables`, `create_complaints_tables`, & `create_pbb_tables` aktif, plus panel
-> Filament & test hijau.
+> **Fase 6 & seterusnya** belum punya stub — akan dibuat langsung di jalur aktif
+> saat fasenya resmi dimulai, mengikuti spesifikasi lengkap PEMBANGUNAN.md bagian 4
+> dan Definition of Done bagian 12 (RBAC/policy, audit log, validasi, dsb.).
 
-## Cara memakai saat fasenya tiba
-1. Pindahkan file kembali ke `app/Http/Controllers/Api/` dan `database/migrations/`.
-2. **Tulis ulang** isinya mengikuti spesifikasi lengkap di PEMBANGUNAN.md bagian 4 —
-   kerangka lama ini hanya stub dan **tidak** memenuhi Definition of Done (bagian 12):
-   belum ada RBAC/policy, audit log, validasi, nomor surat anti-duplikat, dsb.
-3. Tambah test untuk logika kritis.
-
-> Jangan memindahkan file ini kembali sebelum fase-nya secara resmi dimulai.
+Folder ini dipertahankan hanya sebagai catatan historis; tambahkan stub baru ke sini
+bila kelak ada kerangka fitur yang perlu "diparkir" di luar jalur aktif.

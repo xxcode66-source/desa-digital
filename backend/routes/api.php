@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\Api\LetterVerificationController;
 use App\Http\Controllers\Api\PbbController;
+use App\Http\Controllers\Api\UmkmController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['app' => config('app.name'), 'status' => 'ok']));
@@ -64,4 +65,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pbb/deposits', [PbbController::class, 'storeDeposit'])
         ->middleware('throttle:' . config('desa.throttle.pbb_deposit_submit') . ',1');
     Route::get('/my-pbb-deposits', [PbbController::class, 'myDeposits']);
+
+    // Fase 5 — UMKM (warga/pembeli): jelajahi marketplace, detail toko/produk + chat WA, lapor.
+    Route::get('/umkm/categories', [UmkmController::class, 'categories']);
+    Route::get('/umkm/shops', [UmkmController::class, 'browse'])
+        ->middleware('throttle:' . config('desa.throttle.umkm_browse') . ',1');
+    Route::get('/umkm/shops/{shop}', [UmkmController::class, 'shopDetail']);
+    Route::get('/umkm/shops/{shop}/photo', [UmkmController::class, 'shopPhoto']);
+    Route::get('/umkm/shops/{shop}/wa', [UmkmController::class, 'shopWa']);
+    Route::get('/umkm/products/{product}', [UmkmController::class, 'productDetail']);
+    Route::get('/umkm/products/{product}/photos/{photo}', [UmkmController::class, 'productPhoto']);
+    Route::post('/umkm/shops/{shop}/reports', [UmkmController::class, 'reportShop'])
+        ->middleware('throttle:' . config('desa.throttle.umkm_report') . ',1');
+    Route::post('/umkm/products/{product}/reports', [UmkmController::class, 'reportProduct'])
+        ->middleware('throttle:' . config('desa.throttle.umkm_report') . ',1');
+
+    // Fase 5 — UMKM (pelaku): kelola toko sendiri + katalog produk (CRUD + foto).
+    Route::get('/umkm/my-shop', [UmkmController::class, 'myShop']);
+    Route::post('/umkm/my-shop', [UmkmController::class, 'saveShop']);
+    Route::put('/umkm/my-shop', [UmkmController::class, 'saveShop']);
+    Route::post('/umkm/products', [UmkmController::class, 'storeProduct']);
+    Route::put('/umkm/products/{product}', [UmkmController::class, 'updateProduct']);
+    Route::delete('/umkm/products/{product}', [UmkmController::class, 'destroyProduct']);
 });
