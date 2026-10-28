@@ -1,13 +1,16 @@
 openapi: 3.0.3
 info:
   title: API Aplikasi Desa Digital
-  version: 0.2.0-fase1
+  version: 0.3.0-fase2
   description: |
-    Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi): health check, login,
-    registrasi warga dengan NIK + consent (tanpa OTP/SMS pihak ketiga), profil, logout/logout-all.
-    Verifikasi identitas dilakukan operator di panel Filament (status pending -> verified/rejected).
-    Endpoint fitur bisnis (surat, PBB, UMKM, pengaduan) menyusul pada fasenya masing-masing
-    sesuai PEMBANGUNAN.md §8 (aturan satu fase per sesi).
+    Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi) + Fase 2 (Surat):
+    health check, login, registrasi warga dengan NIK + consent (tanpa OTP/SMS pihak ketiga),
+    profil, logout/logout-all, layanan surat dinamis (jenis surat berbasis form_schema,
+    pengajuan multipart + lampiran, lacak status, perbaikan per-field), dan verifikasi
+    keaslian surat publik via QR. Verifikasi internal & penomoran surat dilakukan staff
+    lewat panel Filament, bukan via API warga. Endpoint fitur bisnis lainnya (PBB, UMKM,
+    pengaduan) menyusul pada fasenya masing-masing sesuai PEMBANGUNAN.md §8
+    (aturan satu fase per sesi).
     Auth: header `Authorization: Bearer <token>` (Sanctum personal access token).
 servers:
   - url: /api
@@ -16,6 +19,8 @@ servers:
 tags:
   - name: System
   - name: Auth
+  - name: Letters
+  - name: Public
 
 paths:
   /health:
@@ -161,12 +166,242 @@ paths:
         '401':
           description: Tidak terautentikasi
 
+  /verify-letter/{token}:
+    get:
+      tags: [Public]
+      summary: Verifikasi keaslian surat (hasil scan QR pada surat selesai)
+      description: |
+        Tanpa login; di-rate-limit untuk mencegah scraping (config `desa.throttle.letter_verify`).
+        Hanya surat berstatus `selesai` dengan `public_token` yang dikenali.
+      operationId: verifyLetter
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Surat sah
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean, example: true }
+                  number: { type: string, example: "470/001/DS/10/2026" }
+                  type: { type: string, example: "Surat Keterangan Usaha" }
+                  issued_for: { type: string }
+                  issued_at: { type: string, format: date }
+                  village: { type: string }
+        '404':
+          description: Kode tidak dikenal / surat belum selesai
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean, example: false }
+                  message: { type: string }
+        '429':
+          description: Terlalu banyak permintaan (throttle)
+
+  /letters/types:
+    get:
+      tags: [Letters]
+      summary: Daftar jenis surat aktif (bawaan + milik desa warga)
+      description: |
+        Formulir dirender dinamis di aplikasi dari `form_schema_json` — tidak ada
+        hardcode per jenis surat (PEMBANGUNAN.md 4.2).
+      operationId: letterTypes
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Daftar jenis surat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/LetterType' }
+        '401':
+          description: Tidak terautentikasi
+
+  /letters:
+    get:
+      tags: [Letters]
+      summary: Daftar surat milik warga (terbaru dulu, paginasi 20)
+      operationId: myLetters
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Daftar ringkas surat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/LetterSummary' }
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      page: { type: integer }
+        '401':
+          description: Tidak terautentikasi
+    post:
+      tags: [Letters]
+      summary: Ajukan surat baru (multipart)
+      description: |
+        Hanya warga berstatus `verified` (Policy `Letter@create`, selain itu 403).
+        Rate-limited (config `desa.throttle.letter_submit`). Field formulir dikirim
+        sebagai `data[<key>]` sesuai `form_schema_json` jenis surat; minimal satu
+        lampiran wajib diunggah (foto KTP/KK dsb., maks 5, MIME & ukuran dibatasi
+        config `desa.letters`). Jenis dengan `needs_rt` masuk antrean RT;
+        tanpa pengantar RT langsung ke operator.
+      operationId: submitLetter
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [letter_type_id, attachments]
+              properties:
+                letter_type_id: { type: integer }
+                data:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: "Kirim sebagai field data[nama_key]=nilai."
+                attachments:
+                  type: array
+                  minItems: 1
+                  maxItems: 5
+                  items: { type: string, format: binary }
+                  description: "Kirim sebagai field berulang attachments[]."
+      responses:
+        '201':
+          description: Surat berhasil diajukan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/LetterDetail' }
+        '403':
+          description: Akun belum terverifikasi / bukan warga
+        '422':
+          description: Validasi isian atau lampiran gagal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '429':
+          description: Terlalu sering mengirim (throttle)
+
+  /letters/{letter}:
+    get:
+      tags: [Letters]
+      summary: Detail satu surat + riwayat status + lampiran
+      operationId: letterDetail
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/LetterId' }]
+      responses:
+        '200':
+          description: Data lengkap surat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/LetterDetail' }
+        '403':
+          description: Bukan pemiliknya / lintas desa
+        '404':
+          description: Surat tidak ditemukan
+    put:
+      tags: [Letters]
+      summary: Perbaiki & kirim ulang surat berstatus perlu_perbaikan
+      description: |
+        Hanya saat status `perlu_perbaikan` (Policy `Letter@update`). Field yang ditandai
+        petugas (`flagged_fields`) dirender merah di wizard agar warga tahu persis
+        bagian yang harus diperbaiki. Lampiran baru bersifat opsional (sometimes).
+      operationId: repairLetter
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/LetterId' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                  additionalProperties: { type: string }
+                attachments:
+                  type: array
+                  maxItems: 5
+                  items: { type: string, format: binary }
+      responses:
+        '200':
+          description: Perbaikan terkirim
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/LetterDetail' }
+        '403':
+          description: Bukan pemiliknya / status tidak boleh diubah
+        '422':
+          description: Validasi isian gagal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+
+  /letters/{letter}/attachments/{attachment}:
+    get:
+      tags: [Letters]
+      summary: Unduh lampiran surat (disk privat)
+      description: Hanya untuk pihak yang boleh melihat surat (pemilik / staff desa terkait).
+      operationId: downloadLetterAttachment
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/LetterId' }
+        - name: attachment
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Isi berkas lampiran
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403':
+          description: Tidak diizinkan melihat lampiran ini
+        '404':
+          description: Lampiran tidak ditemukan
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: Sanctum
+
+  parameters:
+    LetterId:
+      name: letter
+      in: path
+      required: true
+      schema: { type: integer }
 
   schemas:
     User:
@@ -203,3 +438,85 @@ components:
           additionalProperties:
             type: array
             items: { type: string }
+    LetterField:
+      type: object
+      description: Satu field formulir dinamis dalam `form_schema_json` jenis surat.
+      properties:
+        key: { type: string, example: "nama_usaha" }
+        label: { type: string, nullable: true }
+        type: { type: string, enum: [text, textarea, select], example: text }
+        required: { type: boolean }
+        options:
+          type: array
+          items: { type: string }
+          nullable: true
+          description: Opsi untuk bertipe `select`.
+    LetterType:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string, example: "sk-usaha" }
+        name: { type: string, example: "Surat Keterangan Usaha" }
+        needs_rt: { type: boolean, description: "Perlu pengantar RT/RW sebelum verifikasi operator." }
+        form_schema_json:
+          type: array
+          items: { $ref: '#/components/schemas/LetterField' }
+        required_attachments_json:
+          type: array
+          items: { type: string }
+          nullable: true
+          description: "Daftar nama lampiran wajib (mis. KTP, KK)."
+    LetterSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        type_name: { type: string }
+        status: { type: string, enum: [diajukan, verifikasi_rt, verifikasi_operator, menunggu_ttd_kades, selesai, perlu_perbaikan, ditolak] }
+        status_label: { type: string, example: "Menunggu tanda tangan kepala desa" }
+        number: { type: string, nullable: true, description: "Nomor surat, terbit otomatis anti-duplikat saat selesai." }
+        submitted_at: { type: string, format: date-time, nullable: true }
+    LetterDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        type:
+          allOf: [{ $ref: '#/components/schemas/LetterType' }]
+          nullable: true
+        status: { type: string, enum: [diajukan, verifikasi_rt, verifikasi_operator, menunggu_ttd_kades, selesai, perlu_perbaikan, ditolak] }
+        status_label: { type: string }
+        number: { type: string, nullable: true }
+        data:
+          type: object
+          additionalProperties: { type: string }
+          description: "Isi formulir sesuai skema jenis surat."
+        note: { type: string, nullable: true, description: "Catatan petugas terakhir (tolak/perbaikan)." }
+        flagged_fields:
+          type: array
+          items: { type: string }
+          description: "Kunci field yang ditandai petugas untuk diperbaiki (tampil merah di wizard)."
+        editable: { type: boolean, description: "true hanya saat status perlu_perbaikan." }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              download_url: { type: string, example: "/api/letters/1/attachments/2" }
+        history:
+          type: array
+          description: "Riwayat perpindahan status (audit, immutabel)."
+          items:
+            type: object
+            properties:
+              from: { type: string, nullable: true }
+              to: { type: string }
+              to_label: { type: string }
+              note: { type: string, nullable: true }
+              flagged:
+                type: array
+                items: { type: string }
+                nullable: true
+              at: { type: string, format: date-time, nullable: true }

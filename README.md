@@ -6,9 +6,10 @@ Laravel** dengan panel operator/admin. Prinsip inti & aturan fase (Fase 0–6,
 RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 [`PEMBANGUNAN.md`](PEMBANGUNAN.md) — baca file itu terlebih dahulu.
 
-> Status: **Fase 0 (Setup) & Fase 1 (Auth & Verifikasi) selesai.** Backend buildable +
-> panel Filament dengan verifikasi warga, Android menghasilkan APK (onboarding, registrasi
-> NIK, profil/status, kunci PIN/biometrik), CI, ERD, API spec, & panduan desain.
+> Status: **Fase 0 (Setup), Fase 1 (Auth & Verifikasi), & Fase 2 (Surat / E-Layanan) selesai.**
+> Backend buildable + panel Filament (verifikasi warga + antrean surat dinamis), Android
+> menghasilkan APK (onboarding, registrasi NIK, PIN/biometrik, wizard surat dari skema,
+> lacak status & perbaikan), CI, ERD, API spec, & panduan desain.
 > Registrasi **tanpa OTP/SMS berbayar** — verifikasi identitas cukup oleh operator desa.
 
 ## Struktur
@@ -66,10 +67,38 @@ desa-digital/
 - Kunci lokal Fase 1: `PinManager` (PIN 6 digit, hash PBKDF2 di `EncryptedSharedPreferences`)
   + `BiometricHelper` (sidik jari/credentials via `androidx.biometric`).
 
+## Fase 2 yang sudah nyata (Surat / E-Layanan)
+
+### Backend
+- Skema dinamis: tabel `letter_types` dengan `form_schema_json` (text/textarea/select) +
+  `required_attachments_json` → formulir surat apa pun bisa dibuat petugas tanpa deploy kode
+  baru. Seed awal: SK Usaha & SK Domisili.
+- Mesin status `LetterStatus` (diajukan → verifikasi_RT → verifikasi_operator →
+  menunggu_ttd_kades → selesai; cabang perlu_perbaikan ↔ diajukan; ditolak wajib alasan),
+  dilindungi `LetterWorkflow` + log riwayat immutabel + audit.
+- Penomoran otomatis **anti-duplikat**: `letter_sequences` + lock-for-update, format
+  `470/{seq}/DS/{bulan}/{tahun}` per desa & per tahun; surat final dapat `public_token` untuk
+  verifikasi QR publik (`GET /api/verify-letter/{token}`).
+- API warga: jenis surat, ajukan (multipart, maks 5 lampiran, MIME/ukuran dibatasi config),
+  lacak, unduh lampiran (disk privat), perbaiki surat bertanda — hanya warga `verified`
+  (`LetterPolicy`), throttle per endpoint. Verifikasi & tanda tangan via panel, bukan API.
+- **70 test phpunit hijau** (mesin status, penomoran anti-dup + custom format, workflow,
+  API submit/lacak/perbaikan/verifikasi publik, policy, smoke panel Filament).
+- Filament: `LetterTypeResource` (CRUD jenis + editor skema dinamis) dan `LetterResource`
+  "Antrean Surat" — aksi maju RT/operator/ttd/selesai, **perbaikan per-field** (petugas
+  centang field mana yang salah → merah di wizard warga), tolak wajib alasan.
+
+### Android
+- Wizard 3 langkah **dirender dinamis dari `form_schema_json`** (tanpa hardcode per jenis),
+  mode perbaikan menampilkan field bertanda merah + catatan petugas.
+- Unggah lampiran via photo picker (maks 5, preview Coil) → multipart `data[key]` +
+  `attachments[]`; lacak status (daftar + detail + riwayat lengkap), antrean masuk dari Beranda
+  ("Ajukan Surat"). Pesan error teknis diterjemahkan ke bahasa warga.
+
 ## Reference fase berikutnya (JANGAN dibangun sekarang)
-Skeleton fitur lama dipindah ke folder *reference* agar aturan satu-fase-per-sesi
-terjaga, masing-masing punya README pemetaan fase:
-- `backend/reference-future-phases/` → Letter (Fase 2), Complaint (Fase 3), PBB (Fase 4), UMKM (Fase 5).
+Stub lama fitur yang belum dibangun dipindah ke folder *reference* agar aturan
+satu-fase-per-sesi terjaga; stub yang sudah diimplementasikan dihapus saat fase-nya selesai:
+- `backend/reference-future-phases/` → Complaint (Fase 3), PBB (Fase 4), UMKM (Fase 5).
 - `android-app/reference-future-phases/` → stub layar fitur yang sama.
 
 ## Cara build

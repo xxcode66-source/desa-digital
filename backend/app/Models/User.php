@@ -48,6 +48,11 @@ class User extends Authenticatable implements FilamentUser
             ->withPivot(['scope_rt', 'scope_rw']);
     }
 
+    public function letters(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Letter::class);
+    }
+
     public function hasRole(string $roleName): bool
     {
         return $this->roles->contains('name', $roleName);

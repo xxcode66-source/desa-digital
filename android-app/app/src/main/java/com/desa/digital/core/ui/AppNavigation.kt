@@ -2,14 +2,19 @@ package com.desa.digital.core.ui
 
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.desa.digital.core.session.SessionViewModel
 import com.desa.digital.feature.auth.ui.LoginScreen
 import com.desa.digital.feature.auth.ui.OnboardingScreen
 import com.desa.digital.feature.auth.ui.RegisterScreen
 import com.desa.digital.feature.home.ui.HomeScreen
+import com.desa.digital.feature.letter.ui.LetterDetailScreen
+import com.desa.digital.feature.letter.ui.LetterListScreen
+import com.desa.digital.feature.letter.ui.LetterWizardScreen
 import com.desa.digital.feature.lock.ui.CreatePinScreen
 import com.desa.digital.feature.lock.ui.LockScreen
 import com.desa.digital.feature.profile.ui.ProfileScreen
@@ -21,10 +26,18 @@ import com.desa.digital.core.session.SessionViewModel.Companion.ONBOARDING
 import com.desa.digital.core.session.SessionViewModel.Companion.PROFILE
 import com.desa.digital.core.session.SessionViewModel.Companion.REGISTER
 
+/** Rute modul Surat Fase 2. */
+const val LETTERS = "letters"
+const val LETTER_NEW = "letters/new"
+const val LETTER_DETAIL = "letters/{letterId}"
+const val LETTER_REPAIR = "letters/{letterId}/repair"
+
+private fun letterIdArg() = navArgument("letterId") { type = NavType.LongType }
+
 /**
- * Grafik navigasi Fase 1: onboarding -> (login|register) -> buat PIN -> beranda -> profil.
- * Rute awal ditentukan [SessionViewModel] (belum login / terkunci / belum ada PIN).
- * Rute fitur surat/PBB/UMKM/pengaduan menyusul pada Fase 2-5.
+ * Grafik navigasi Fase 1+2: onboarding -> (login|register) -> buat PIN -> beranda -> profil,
+ * ditambah modul surat (daftar -> wizard -> detail -> perbaikan). Rute awal ditentukan
+ * [SessionViewModel]. PBB/UMKM/pengaduan menyusul pada Fase 3-5.
  */
 @Composable
 fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
@@ -67,7 +80,10 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
             })
         }
         composable(HOME) {
-            HomeScreen(onOpenProfile = { navController.navigate(PROFILE) })
+            HomeScreen(
+                onOpenProfile = { navController.navigate(PROFILE) },
+                onOpenLetters = { navController.navigate(LETTERS) },
+            )
         }
         composable(PROFILE) {
             ProfileScreen(onLoggedOut = {
@@ -75,6 +91,39 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
                     popUpTo(navController.graph.id) { inclusive = true }
                 }
             })
+        }
+
+        // ---- Fase 2: Surat ----
+        composable(LETTERS) {
+            LetterListScreen(
+                onBack = { navController.popBackStack() },
+                onNewLetter = { navController.navigate(LETTER_NEW) },
+                onOpenDetail = { id -> navController.navigate("letters/$id") },
+            )
+        }
+        composable(LETTER_NEW) {
+            LetterWizardScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDetail = { id ->
+                    navController.navigate("letters/$id") {
+                        popUpTo(LETTERS) { inclusive = false }
+                    }
+                },
+            )
+        }
+        composable(LETTER_DETAIL, arguments = listOf(letterIdArg())) { entry ->
+            LetterDetailScreen(
+                letterId = entry.arguments?.getLong("letterId") ?: 0L,
+                onBack = { navController.popBackStack() },
+                onRepair = { id -> navController.navigate("letters/$id/repair") },
+            )
+        }
+        composable(LETTER_REPAIR, arguments = listOf(letterIdArg())) { entry ->
+            LetterWizardScreen(
+                repairLetterId = entry.arguments?.getLong("letterId"),
+                onBack = { navController.popBackStack() },
+                onOpenDetail = { id -> navController.navigate("letters/$id") },
+            )
         }
     }
 }
