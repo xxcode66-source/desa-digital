@@ -11,6 +11,9 @@ import com.desa.digital.core.session.SessionViewModel
 import com.desa.digital.feature.auth.ui.LoginScreen
 import com.desa.digital.feature.auth.ui.OnboardingScreen
 import com.desa.digital.feature.auth.ui.RegisterScreen
+import com.desa.digital.feature.complaint.ui.ComplaintDetailScreen
+import com.desa.digital.feature.complaint.ui.ComplaintFormScreen
+import com.desa.digital.feature.complaint.ui.ComplaintListScreen
 import com.desa.digital.feature.home.ui.HomeScreen
 import com.desa.digital.feature.letter.ui.LetterDetailScreen
 import com.desa.digital.feature.letter.ui.LetterListScreen
@@ -32,7 +35,13 @@ const val LETTER_NEW = "letters/new"
 const val LETTER_DETAIL = "letters/{letterId}"
 const val LETTER_REPAIR = "letters/{letterId}/repair"
 
+/** Rute modul Pengaduan Fase 3. */
+const val COMPLAINTS = "complaints"
+const val COMPLAINT_NEW = "complaints/new"
+const val COMPLAINT_DETAIL = "complaints/{complaintId}"
+
 private fun letterIdArg() = navArgument("letterId") { type = NavType.LongType }
+private fun complaintIdArg() = navArgument("complaintId") { type = NavType.LongType }
 
 /**
  * Grafik navigasi Fase 1+2: onboarding -> (login|register) -> buat PIN -> beranda -> profil,
@@ -83,6 +92,7 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
             HomeScreen(
                 onOpenProfile = { navController.navigate(PROFILE) },
                 onOpenLetters = { navController.navigate(LETTERS) },
+                onOpenComplaints = { navController.navigate(COMPLAINTS) },
             )
         }
         composable(PROFILE) {
@@ -123,6 +133,31 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 repairLetterId = entry.arguments?.getLong("letterId"),
                 onBack = { navController.popBackStack() },
                 onOpenDetail = { id -> navController.navigate("letters/$id") },
+            )
+        }
+
+        // ---- Fase 3: Pengaduan ----
+        composable(COMPLAINTS) {
+            ComplaintListScreen(
+                onBack = { navController.popBackStack() },
+                onNewComplaint = { navController.navigate(COMPLAINT_NEW) },
+                onOpenDetail = { id -> navController.navigate("complaints/$id") },
+            )
+        }
+        composable(COMPLAINT_NEW) {
+            ComplaintFormScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDetail = { id ->
+                    navController.navigate("complaints/$id") {
+                        popUpTo(COMPLAINTS) { inclusive = false }
+                    }
+                },
+            )
+        }
+        composable(COMPLAINT_DETAIL, arguments = listOf(complaintIdArg())) { entry ->
+            ComplaintDetailScreen(
+                complaintId = entry.arguments?.getLong("complaintId") ?: 0L,
+                onBack = { navController.popBackStack() },
             )
         }
     }

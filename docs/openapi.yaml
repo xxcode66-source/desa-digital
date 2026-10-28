@@ -1,15 +1,17 @@
 openapi: 3.0.3
 info:
   title: API Aplikasi Desa Digital
-  version: 0.3.0-fase2
+  version: 0.4.0-fase3
   description: |
-    Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi) + Fase 2 (Surat):
-    health check, login, registrasi warga dengan NIK + consent (tanpa OTP/SMS pihak ketiga),
-    profil, logout/logout-all, layanan surat dinamis (jenis surat berbasis form_schema,
-    pengajuan multipart + lampiran, lacak status, perbaikan per-field), dan verifikasi
-    keaslian surat publik via QR. Verifikasi internal & penomoran surat dilakukan staff
-    lewat panel Filament, bukan via API warga. Endpoint fitur bisnis lainnya (PBB, UMKM,
-    pengaduan) menyusul pada fasenya masing-masing sesuai PEMBANGUNAN.md §8
+    Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi) + Fase 2 (Surat) +
+    Fase 3 (Pengaduan): health check, login, registrasi warga dengan NIK + consent (tanpa
+    OTP/SMS pihak ketiga), profil, logout/logout-all, layanan surat dinamis (jenis surat
+    berbasis form_schema, pengajuan multipart + lampiran, lacak status, perbaikan per-field),
+    verifikasi keaslian surat publik via QR, dan pengaduan warga (kategori baku, foto bukti +
+    lokasi opsional, kirim anonim, status diterima/diproses/selesai/ditolak, balasan &
+    kronologi, papan publik yang menyamarkan pelapor anonim). Verifikasi & penanganan
+    pengaduan dilakukan staff lewat panel Filament, bukan via API warga. Endpoint fitur
+    bisnis lainnya (PBB, UMKM) menyusul pada fasenya masing-masing sesuai PEMBANGUNAN.md §8
     (aturan satu fase per sesi).
     Auth: header `Authorization: Bearer <token>` (Sanctum personal access token).
 servers:
@@ -20,6 +22,7 @@ tags:
   - name: System
   - name: Auth
   - name: Letters
+  - name: Complaints
   - name: Public
 
 paths:
@@ -389,6 +392,217 @@ paths:
         '404':
           description: Lampiran tidak ditemukan
 
+  /complaints:
+    get:
+      tags: [Complaints, Public]
+      summary: Papan publik pengaduan (identitas pelapor anonim disamarkan)
+      description: |
+        Tanpa login; di-rate-limit (config `desa.throttle.complaint_browse`). Menampilkan
+        laporan terbaru (paginasi 20) dengan `reporter_name` = "Warga anonim" untuk laporan
+        yang ditandai anonim, dan nama pelapor untuk laporan biasa. Filter `village_id` opsional.
+      operationId: complaintWall
+      parameters:
+        - name: village_id
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Daftar pengaduan untuk publik
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ComplaintWallItem' }
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      page: { type: integer }
+        '429':
+          description: Terlalu banyak permintaan (throttle)
+    post:
+      tags: [Complaints]
+      summary: "Ajukan pengaduan baru (multipart: isian + photos[])"
+      description: |
+        Hanya warga berstatus `verified` (Policy `Complaint@create`, selain itu 403).
+        Rate-limited (config `desa.throttle.complaint_submit`). Kategori harus salah satu
+        kode dari `/complaints/categories`. Foto bukti opsional (maks `desa.complaints.max_photos`,
+        MIME & ukuran dibatasi config). `is_anonymous` hanya menyembunyikan nama di papan
+        publik — pelapor tetap tercatat untuk petugas desa.
+      operationId: submitComplaint
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [category, title, description]
+              properties:
+                category: { type: string, example: "jalan_rusak" }
+                title: { type: string, maxLength: 150 }
+                description: { type: string, maxLength: 5000 }
+                location: { type: string, nullable: true, maxLength: 255 }
+                latitude: { type: number, format: float, nullable: true }
+                longitude: { type: number, format: float, nullable: true }
+                is_anonymous: { type: boolean, default: false }
+                photos:
+                  type: array
+                  maxItems: 3
+                  items: { type: string, format: binary }
+                  description: "Kirim sebagai field berulang photos[]."
+      responses:
+        '201':
+          description: Laporan berhasil dikirim
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/ComplaintDetail' }
+        '403':
+          description: Akun belum terverifikasi / bukan warga
+        '422':
+          description: Validasi isian atau foto gagal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '429':
+          description: Terlalu sering mengirim (throttle)
+
+  /complaints/categories:
+    get:
+      tags: [Complaints]
+      summary: Kategori baku pengaduan (dari config desa)
+      operationId: complaintCategories
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Daftar kategori
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ComplaintCategory' }
+        '401':
+          description: Tidak terautentikasi
+
+  /my-complaints:
+    get:
+      tags: [Complaints]
+      summary: Daftar pengaduan milik warga yang login (terbaru dulu, paginasi 20)
+      operationId: myComplaints
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Daftar ringkas pengaduan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ComplaintSummary' }
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      page: { type: integer }
+        '401':
+          description: Tidak terautentikasi
+
+  /complaints/{complaint}:
+    get:
+      tags: [Complaints]
+      summary: Detail satu pengaduan + foto bukti + kronologi
+      description: Hanya pemilik atau petugas desa yang sama (Policy `Complaint@view`).
+      operationId: complaintDetail
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ComplaintId' }]
+      responses:
+        '200':
+          description: Data lengkap pengaduan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ComplaintDetail' }
+        '403':
+          description: Bukan pemiliknya / lintas desa
+        '404':
+          description: Pengaduan tidak ditemukan
+
+  /complaints/{complaint}/replies:
+    post:
+      tags: [Complaints]
+      summary: Balasan pada pengaduan yang masih terbuka
+      description: |
+        Pemilik bisa membalas selama laporan belum selesai/ditolak; petugas desa yang sama
+        selalu bisa. Perubahan status (diproses/selesai/ditolak) dilakukan staff via panel Filament.
+      operationId: replyComplaint
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/ComplaintId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: Balasan terkirim
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/ComplaintDetail' }
+        '403':
+          description: Bukan pemiliknya / laporan sudah ditutup
+        '422':
+          description: Balasan kosong
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+
+  /complaints/{complaint}/photos/{photo}:
+    get:
+      tags: [Complaints]
+      summary: Unduh foto bukti (disk privat)
+      description: Hanya untuk pihak yang boleh melihat pengaduan (pemilik / staff desa terkait).
+      operationId: downloadComplaintPhoto
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ComplaintId' }
+        - name: photo
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Isi berkas foto
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403':
+          description: Tidak diizinkan melihat foto ini
+        '404':
+          description: Foto tidak ditemukan
+
 components:
   securitySchemes:
     bearerAuth:
@@ -399,6 +613,11 @@ components:
   parameters:
     LetterId:
       name: letter
+      in: path
+      required: true
+      schema: { type: integer }
+    ComplaintId:
+      name: complaint
       in: path
       required: true
       schema: { type: integer }
@@ -520,3 +739,81 @@ components:
                 items: { type: string }
                 nullable: true
               at: { type: string, format: date-time, nullable: true }
+    ComplaintCategory:
+      type: object
+      description: Satu kategori baku pengaduan dari config desa.
+      properties:
+        code: { type: string, example: "jalan_rusak" }
+        label: { type: string, example: "Jalan Rusak" }
+    ComplaintSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        category_label: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [diterima, diproses, selesai, ditolak] }
+        status_label: { type: string, example: "Sedang diproses" }
+        closed: { type: boolean, description: "true bila selesai/ditolak (percakapan ditutup)." }
+        submitted_at: { type: string, format: date-time, nullable: true }
+    ComplaintWallItem:
+      type: object
+      description: Entitas papan publik — identitas pelapor anonim sudah disamarkan server.
+      properties:
+        id: { type: integer }
+        category_label: { type: string }
+        title: { type: string }
+        description: { type: string }
+        location: { type: string, nullable: true }
+        status: { type: string, enum: [diterima, diproses, selesai, ditolak] }
+        status_label: { type: string }
+        reporter_name: { type: string, example: "Warga anonim", description: "Nama pelapor, atau 'Warga anonim' bila laporan ditandai anonim." }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        resolved_at: { type: string, format: date-time, nullable: true }
+    ComplaintPhoto:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        download_url: { type: string, example: "/api/complaints/1/photos/2" }
+    ComplaintTimelineEntry:
+      type: object
+      description: "Satu baris kronologi: balasan (to_status null) atau perubahan status (to_status terisi)."
+      properties:
+        id: { type: integer }
+        body: { type: string, nullable: true }
+        is_staff: { type: boolean, description: "true bila ditulis oleh petugas desa." }
+        author: { type: string, description: "Nama penulis, atau 'Sistem'/'Petugas'." }
+        to_status: { type: string, enum: [diterima, diproses, selesai, ditolak], nullable: true }
+        to_label: { type: string, nullable: true }
+        at: { type: string, format: date-time, nullable: true }
+    ComplaintDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        category: { type: string, example: "jalan_rusak" }
+        category_label: { type: string }
+        title: { type: string }
+        description: { type: string }
+        location: { type: string, nullable: true }
+        latitude: { type: number, format: float, nullable: true }
+        longitude: { type: number, format: float, nullable: true }
+        status: { type: string, enum: [diterima, diproses, selesai, ditolak] }
+        status_label: { type: string }
+        is_anonymous: { type: boolean }
+        reporter:
+          type: object
+          nullable: true
+          description: "Identitas pelapor — selalu tampil untuk pemilik & petugas desa, walau laporan anonim."
+          properties:
+            id: { type: integer, nullable: true }
+            name: { type: string, nullable: true }
+        closed: { type: boolean }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        resolved_at: { type: string, format: date-time, nullable: true }
+        photos:
+          type: array
+          items: { $ref: '#/components/schemas/ComplaintPhoto' }
+        timeline:
+          type: array
+          description: "Kronologi + balasan (audit, immutabel)."
+          items: { $ref: '#/components/schemas/ComplaintTimelineEntry' }

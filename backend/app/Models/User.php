@@ -53,6 +53,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Letter::class);
     }
 
+    public function complaints(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Complaint::class);
+    }
+
     public function hasRole(string $roleName): bool
     {
         return $this->roles->contains('name', $roleName);

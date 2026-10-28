@@ -1,5 +1,9 @@
 package com.desa.digital.core.network
 
+import com.desa.digital.core.network.dto.ComplaintCategoryListResponse
+import com.desa.digital.core.network.dto.ComplaintDataResponse
+import com.desa.digital.core.network.dto.ComplaintListResponse
+import com.desa.digital.core.network.dto.ComplaintReplyRequest
 import com.desa.digital.core.network.dto.LetterDataResponse
 import com.desa.digital.core.network.dto.LetterListResponse
 import com.desa.digital.core.network.dto.LetterTypeListResponse
@@ -72,4 +76,31 @@ interface ApiService {
         @PartMap parts: Map<String, RequestBody>,
         @Part files: List<MultipartBody.Part>,
     ): LetterDataResponse
+
+    // ---- Fase 3: Pengaduan (warga) ----
+
+    /** Kategori baku pengaduan untuk mengisi pilihan pada formulir. */
+    @GET("api/complaints/categories")
+    suspend fun complaintCategories(): ComplaintCategoryListResponse
+
+    /** Ajukan pengaduan. parts: category/title/description/location/latitude/longitude/is_anonymous; files: photos[]. */
+    @Multipart
+    @POST("api/complaints")
+    suspend fun submitComplaint(
+        @PartMap parts: Map<String, RequestBody>,
+        @Part files: List<MultipartBody.Part>,
+    ): ComplaintDataResponse
+
+    @GET("api/my-complaints")
+    suspend fun myComplaints(): ComplaintListResponse
+
+    @GET("api/complaints/{id}")
+    suspend fun complaintDetail(@Path("id") complaintId: Long): ComplaintDataResponse
+
+    /** Balasan warga pada pengaduan yang masih terbuka. */
+    @POST("api/complaints/{id}/replies")
+    suspend fun replyComplaint(
+        @Path("id") complaintId: Long,
+        @Body body: ComplaintReplyRequest,
+    ): ComplaintDataResponse
 }

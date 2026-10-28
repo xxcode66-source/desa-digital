@@ -5,6 +5,7 @@
 // fitur bisnis (surat/PBB/UMKM/pengaduan) menyusul pada fasenya.
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\Api\LetterVerificationController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,10 @@ Route::post('/register', [AuthController::class, 'register'])
 Route::get('/verify-letter/{token}', [LetterVerificationController::class, 'verify'])
     ->middleware('throttle:' . config('desa.throttle.letter_verify') . ',1');
 
+// Publik: papan pengaduan warga (identitas pelapor disamarkan bila anonim). Dibatasi.
+Route::get('/complaints', [ComplaintController::class, 'index'])
+    ->middleware('throttle:' . config('desa.throttle.complaint_browse') . ',1');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -33,4 +38,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/letters/{letter}', [LetterController::class, 'show']);
     Route::put('/letters/{letter}', [LetterController::class, 'update']);
     Route::get('/letters/{letter}/attachments/{attachment}', [LetterController::class, 'attachment']);
+
+    // Fase 3 — Pengaduan (warga): kategori, ajukan, daftar milik sendiri, lacak, balas, foto.
+    Route::get('/complaints/categories', [ComplaintController::class, 'categories']);
+    Route::post('/complaints', [ComplaintController::class, 'store'])
+        ->middleware('throttle:' . config('desa.throttle.complaint_submit') . ',1');
+    Route::get('/my-complaints', [ComplaintController::class, 'mine']);
+    Route::get('/complaints/{complaint}', [ComplaintController::class, 'show']);
+    Route::post('/complaints/{complaint}/replies', [ComplaintController::class, 'reply']);
+    Route::get('/complaints/{complaint}/photos/{photo}', [ComplaintController::class, 'photo']);
 });

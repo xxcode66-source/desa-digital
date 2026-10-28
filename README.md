@@ -6,10 +6,12 @@ Laravel** dengan panel operator/admin. Prinsip inti & aturan fase (Fase 0–6,
 RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 [`PEMBANGUNAN.md`](PEMBANGUNAN.md) — baca file itu terlebih dahulu.
 
-> Status: **Fase 0 (Setup), Fase 1 (Auth & Verifikasi), & Fase 2 (Surat / E-Layanan) selesai.**
-> Backend buildable + panel Filament (verifikasi warga + antrean surat dinamis), Android
-> menghasilkan APK (onboarding, registrasi NIK, PIN/biometrik, wizard surat dari skema,
-> lacak status & perbaikan), CI, ERD, API spec, & panduan desain.
+> Status: **Fase 0 (Setup), Fase 1 (Auth & Verifikasi), Fase 2 (Surat / E-Layanan), &
+> Fase 3 (Pengaduan) selesai.**
+> Backend buildable + panel Filament (verifikasi warga + antrean surat dinamis + antrean
+> pengaduan), Android menghasilkan APK (onboarding, registrasi NIK, PIN/biometrik, wizard
+> surat dari skema, lacak status & perbaikan, formulir pengaduan + foto + lacak & balasan),
+> CI, ERD, API spec, & panduan desain.
 > Registrasi **tanpa OTP/SMS berbayar** — verifikasi identitas cukup oleh operator desa.
 
 ## Struktur
@@ -95,10 +97,37 @@ desa-digital/
   `attachments[]`; lacak status (daftar + detail + riwayat lengkap), antrean masuk dari Beranda
   ("Ajukan Surat"). Pesan error teknis diterjemahkan ke bahasa warga.
 
+## Fase 3 yang sudah nyata (Pengaduan)
+
+### Backend
+- Tabel `complaints` + `complaint_photos` + `complaint_replies` (semua ber-`village_id`).
+  `complaint_replies` ganda fungsi: percakapan (balasan) **dan** kronologi (perubahan status).
+- Mesin status `ComplaintStatus` (diterima → diproses → selesai/ditolak; transisi mundur
+  ditolak; **penolakan wajib alasan**), dilindungi `ComplaintWorkflow` + catatan kronologi
+  immutabel + audit. Kategori baku dari config `desa.complaints.categories` (jalan rusak,
+  sampah, keamanan, penerangan, pelayanan, saluran air, lainnya) — mudah ditambah tanpa kode.
+- API warga: kategori, ajukan (multipart `category/title/description` + `photos[]`, maks 3,
+  MIME/ukuran dibatasi config, lokasi & lat/lng opsional, **opsi anonim**), lacak milik sendiri
+  (`my-complaints`), detail + kronologi, balasan, unduh foto (disk privat) — hanya warga
+  `verified` (`ComplaintPolicy`), throttle `complaint_submit`/`complaint_browse`.
+- **Papan publik** `GET /api/complaints` (tanpa login): menyamarkan nama pelapor jadi "Warga
+  anonim" untuk laporan anonim — namun identitas **tetap tercatat** & terlihat petugas.
+- **102 test phpunit hijau** (mesin status, workflow transisi/alasan/audit, API submit/lacak/
+  balasan/unduh/penyamaran anonim, policy, smoke panel Filament).
+- Filament: `ComplaintResource` "Pengaduan Warga" — list multi-tenant, badge status, aksi
+  **Proses/Selesai/Tolak** (tolak wajib alasan) + **Balasan petugas**, infolist foto & kronologi.
+
+### Android
+- Modul `feature/complaint`: formulir (pilih kategori, judul, penjelasan, lokasi opsional,
+  foto bukti maks 3 via photo picker + preview Coil, **switch kirim anonim**) → multipart.
+- Daftar laporan milik warga (lacak badge status), detail + kronologi (perubahan status &
+  balasan petugas), kolom balasan selama laporan terbuka. Entri dari Beranda ("Pengaduan").
+
 ## Reference fase berikutnya (JANGAN dibangun sekarang)
 Stub lama fitur yang belum dibangun dipindah ke folder *reference* agar aturan
-satu-fase-per-sesi terjaga; stub yang sudah diimplementasikan dihapus saat fase-nya selesai:
-- `backend/reference-future-phases/` → Complaint (Fase 3), PBB (Fase 4), UMKM (Fase 5).
+satu-fase-per-sesi terjaga; stub yang sudah diimplementasikan dihapus saat fase-nya selesai
+(Surat/Fase 2 & Pengaduan/Fase 3 sudah dihapus):
+- `backend/reference-future-phases/` → PBB (Fase 4), UMKM (Fase 5).
 - `android-app/reference-future-phases/` → stub layar fitur yang sama.
 
 ## Cara build
