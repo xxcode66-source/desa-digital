@@ -8,7 +8,8 @@ RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 
 > Status: **Fase 0 (Setup) & Fase 1 (Auth & Verifikasi) selesai.** Backend buildable +
 > panel Filament dengan verifikasi warga, Android menghasilkan APK (onboarding, registrasi
-> NIK+OTP, profil/status, kunci PIN/biometrik), CI, ERD, API spec, & panduan desain.
+> NIK, profil/status, kunci PIN/biometrik), CI, ERD, API spec, & panduan desain.
+> Registrasi **tanpa OTP/SMS berbayar** — verifikasi identitas cukup oleh operator desa.
 
 ## Struktur
 
@@ -49,19 +50,18 @@ desa-digital/
 ## Fase 1 yang sudah nyata (Auth & Verifikasi)
 
 ### Backend
-- Aturan `NikValid` (struktur NIK 16 digit), `OtpService` + migrasi `otp_codes`
-  (kode ter-hash, TTL 5 mnt, maks 5 percobaan), migrasi `add_auth_fields_to_users`
-  (`phone_verified_at`, `consent_given_at`, `terms_version`).
-- API: `POST /api/register/otp`, `POST /api/register` (status `pending` + role `warga`),
-  `POST /api/logout-all`; login kini menolak (403) bila nomor belum terverifikasi OTP.
+- Aturan `NikValid` (struktur NIK 16 digit), migrasi `add_auth_fields_to_users`
+  (`consent_given_at`, `terms_version`). **Tanpa OTP/SMS pihak ketiga.**
+- API: `POST /api/register` (status `pending` + role `warga` + consent UU PDP),
+  `POST /api/logout-all`; warga bisa langsung login setelah daftar.
 - RBAC nyata: `UserPolicy` (verify/reject/manageRoles/update, semua scoped `village_id`)
   & `VillagePolicy`. Rate limiting tiap endpoint sensitif (config `desa.php`).
-- **33 test phpunit hijau** (NIK unit, register/OTP feature, RBAC Gate, + Fase 0).
+- **29 test phpunit hijau** (NIK unit, register feature, RBAC Gate, + Fase 0).
 - Filament: `UserResource` "Verifikasi Warga" — list multi-tenant (khusus desa operator),
   badge status, aksi **Setujui/Tolak** (ter-audit), edit role khusus kades/admin.
 
 ### Android
-- Alur lengkap: onboarding → registrasi (form + OTP dua fase) → login → **buat PIN** →
+- Alur lengkap: onboarding → registrasi (NIK + consent) → login → **buat PIN** →
   beranda (banner status verifikasi) → profil & logout (semua perangkat).
 - Kunci lokal Fase 1: `PinManager` (PIN 6 digit, hash PBKDF2 di `EncryptedSharedPreferences`)
   + `BiometricHelper` (sidik jari/credentials via `androidx.biometric`).

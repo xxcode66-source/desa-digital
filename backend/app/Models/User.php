@@ -23,7 +23,7 @@ class User extends Authenticatable implements FilamentUser
 
     protected $fillable = [
         'village_id', 'nik', 'name', 'phone', 'email', 'password', 'status', 'rt', 'rw',
-        'phone_verified_at', 'consent_given_at', 'terms_version',
+        'consent_given_at', 'terms_version',
     ];
 
     protected $hidden = ['password', 'remember_token', 'nik'];
@@ -33,7 +33,6 @@ class User extends Authenticatable implements FilamentUser
         return [
             'password' => 'hashed',
             'village_id' => 'integer',
-            'phone_verified_at' => 'datetime',
             'consent_given_at' => 'datetime',
         ];
     }
@@ -72,11 +71,6 @@ class User extends Authenticatable implements FilamentUser
     public function isVerified(): bool
     {
         return $this->status === self::STATUS_VERIFIED;
-    }
-
-    public function isPhoneVerified(): bool
-    {
-        return $this->phone_verified_at !== null;
     }
 
     /** Beri role (idempotent) — dipakai saat registrasi & verifikasi operator. */

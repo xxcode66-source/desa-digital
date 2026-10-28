@@ -33,7 +33,6 @@ fun RegisterScreen(
     var rt by remember { mutableStateOf("") }
     var rw by remember { mutableStateOf("") }
     var consent by remember { mutableStateOf(false) }
-    var otp by remember { mutableStateOf("") }
 
     val showError = state is RegisterUiState.Error
     val loading = state is RegisterUiState.Loading
@@ -50,65 +49,40 @@ fun RegisterScreen(
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            if (state is RegisterUiState.SentOtp) {
-                // FASE OTP — konfirmasi nomor dengan kode 6 digit.
-                val sent = state as RegisterUiState.SentOtp
-                Text("Kode verifikasi telah dikirim ke ${sent.phone}.", style = MaterialTheme.typography.bodyLarge)
-                if (sent.debugOtp != null) {
-                    Spacer(Modifier.height(8.dp))
-                    AssistChip(onClick = { otp = sent.debugOtp }, label = { Text("Dev: isi ${sent.debugOtp}") })
-                }
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = otp,
-                    onValueChange = { if (it.length <= 6) otp = it },
-                    label = { Text("Kode verifikasi (6 digit)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (showError) {
-                    Spacer(Modifier.height(12.dp))
-                    Text((state as RegisterUiState.Error).message, color = MaterialTheme.colorScheme.error)
-                }
-                Spacer(Modifier.height(24.dp))
-                Button(
-                    onClick = { viewModel.submitRegister(otp) },
-                    enabled = !loading,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                ) { if (loading) Loader() else Text("Selesaikan Pendaftaran") }
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = { viewModel.backToForm() }) { Text("Ganti nomor / kembali") }
-            } else {
-                // FASE FORM — data diri.
-                FormField("Kode Desa (village_id)", villageId, KeyboardType.Number) { villageId = it }
-                FormField("NIK (16 digit)", nik, KeyboardType.Number) { if (it.length <= 16) nik = it }
-                FormField("Nama lengkap", name) { name = it }
-                FormField("Nomor HP", phone, KeyboardType.Phone) { phone = it }
-                FormField("Password (min 8)", password, KeyboardType.Password, password = true) { password = it }
-                FormField("Ulangi password", confirm, KeyboardType.Password, password = true) { confirm = it }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.weight(1f)) { FormField("RT", rt, KeyboardType.Number) { rt = it } }
-                    Box(Modifier.weight(1f)) { FormField("RW", rw, KeyboardType.Number) { rw = it } }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = consent, onCheckedChange = { consent = it })
-                    Text("Saya menyetujui penggunaan data sesuai ketentuan desa.")
-                }
-                if (showError) {
-                    Spacer(Modifier.height(12.dp))
-                    Text((state as RegisterUiState.Error).message, color = MaterialTheme.colorScheme.error)
-                }
-                Spacer(Modifier.height(24.dp))
-                Button(
-                    onClick = { viewModel.sendOtp(villageId, nik, name, phone, password, confirm, rt, rw, consent) },
-                    enabled = !loading,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                ) { if (loading) Loader() else Text("Kirim Kode Verifikasi") }
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = onBackToLogin) { Text("Sudah punya akun? Masuk") }
+            Text(
+                "Data Anda akan diperiksa oleh petugas desa. Setelah disetujui, akun aktif penuh.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            FormField("Kode Desa (village_id)", villageId, KeyboardType.Number) { villageId = it }
+            FormField("NIK (16 digit)", nik, KeyboardType.Number) { if (it.length <= 16) nik = it }
+            FormField("Nama lengkap", name) { name = it }
+            FormField("Nomor HP", phone, KeyboardType.Phone) { phone = it }
+            FormField("Password (min 8)", password, KeyboardType.Password, password = true) { password = it }
+            FormField("Ulangi password", confirm, KeyboardType.Password, password = true) { confirm = it }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.weight(1f)) { FormField("RT", rt, KeyboardType.Number) { rt = it } }
+                Box(Modifier.weight(1f)) { FormField("RW", rw, KeyboardType.Number) { rw = it } }
             }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = consent, onCheckedChange = { consent = it })
+                Text("Saya menyetujui penggunaan data sesuai ketentuan desa.")
+            }
+            if (showError) {
+                Spacer(Modifier.height(12.dp))
+                Text((state as RegisterUiState.Error).message, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = { viewModel.submit(villageId, nik, name, phone, password, confirm, rt, rw, consent) },
+                enabled = !loading,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+            ) { if (loading) Loader() else Text("Daftar") }
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onBackToLogin) { Text("Sudah punya akun? Masuk") }
         }
     }
 }

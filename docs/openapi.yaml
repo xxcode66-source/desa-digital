@@ -4,7 +4,7 @@ info:
   version: 0.2.0-fase1
   description: |
     Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi): health check, login,
-    registrasi warga dengan NIK + OTP verifikasi nomor HP, profil, logout/logout-all.
+    registrasi warga dengan NIK + consent (tanpa OTP/SMS pihak ketiga), profil, logout/logout-all.
     Verifikasi identitas dilakukan operator di panel Filament (status pending -> verified/rejected).
     Endpoint fitur bisnis (surat, PBB, UMKM, pengaduan) menyusul pada fasenya masing-masing
     sesuai PEMBANGUNAN.md §8 (aturan satu fase per sesi).
@@ -37,7 +37,7 @@ paths:
     post:
       tags: [Auth]
       summary: Login (nomor HP + password) -> token Sanctum
-      description: Rate-limited 10 request/menit. Menolak (403) bila nomor HP belum diverifikasi OTP.
+      description: Rate-limited 10 request/menit.
       operationId: login
       requestBody:
         required: true
@@ -64,15 +64,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Message' }
-        '403':
-          description: Nomor HP belum diverifikasi (code = phone_unverified)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message: { type: string }
-                  code: { type: string, example: phone_unverified }
         '422':
           description: Validasi input gagal
           content:
@@ -81,46 +72,15 @@ paths:
         '429':
           description: Terlalu banyak percobaan (throttle)
 
-  /register/otp:
-    post:
-      tags: [Auth]
-      summary: Kirim kode OTP untuk registrasi (verifikasi kepemilikan nomor HP)
-      description: |
-        Rate-limited 5 request/menit. Nomor tidak boleh sudah terdaftar. Kode disimpan
-        ter-hash (TTL 5 menit, maks 5 percobaan). Field `debug_otp` hanya muncul di
-        environment local/testing — JANGAN di produksi.
-      operationId: sendRegisterOtp
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [phone]
-              properties:
-                phone: { type: string, example: "08123456789" }
-      responses:
-        '200':
-          description: Kode terkirim
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/OtpSendResponse' }
-        '422':
-          description: Nomor tidak valid / sudah terdaftar
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429':
-          description: Terlalu sering mengirim OTP
-
   /register:
     post:
       tags: [Auth]
-      summary: Daftar akun warga baru (NIK + OTP + consent)
+      summary: Daftar akun warga baru (NIK + consent)
       description: |
-        Rate-limited. Memverifikasi `otp_code` (purpose=register), membuat user dengan
-        status pending + role `warga`, menandai phone_verified_at & consent, lalu memberi
-        token agar warga bisa login & memantau status verifikasinya.
+        Rate-limited. Memvalidasi NIK (struktur) + consent (UU PDP), membuat user dengan
+        status pending + role `warga`, lalu memberi token agar warga bisa login & memantau
+        status verifikasinya. Nomor HP TIDAK diverifikasi via OTP (tanpa gateway berbayar);
+        verifikasi identitas dilakukan operator di panel.
       operationId: register
       requestBody:
         required: true
@@ -128,7 +88,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [village_id, nik, name, phone, password, password_confirmation, otp_code, consent]
+              required: [village_id, nik, name, phone, password, password_confirmation, consent]
               properties:
                 village_id: { type: integer }
                 nik: { type: string, pattern: '^[0-9]{16}$', description: "16 digit, divalidasi strukturnya (NikValid)." }
@@ -138,7 +98,6 @@ paths:
                 password_confirmation: { type: string, format: password }
                 rt: { type: string, nullable: true }
                 rw: { type: string, nullable: true }
-                otp_code: { type: string, pattern: '^[0-9]{6}$' }
                 consent: { type: boolean, example: true, description: "Persetujuan penggunaan data (UU PDP)." }
       responses:
         '201':
@@ -152,7 +111,7 @@ paths:
                   token: { type: string }
                   user: { $ref: '#/components/schemas/User' }
         '422':
-          description: Validasi gagal atau OTP salah/kedaluwarsa
+          description: Validasi gagal
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ValidationError' }
@@ -221,7 +180,6 @@ components:
         status: { type: string, enum: [pending, verified, rejected] }
         rt: { type: string, nullable: true }
         rw: { type: string, nullable: true }
-        phone_verified_at: { type: string, format: date-time, nullable: true, description: "Nomor HP sudah diverifikasi OTP." }
         consent_given_at: { type: string, format: date-time, nullable: true }
         terms_version: { type: string, nullable: true }
         roles:
@@ -232,11 +190,6 @@ components:
       properties:
         name: { type: string, example: "admin" }
         label: { type: string, example: "Administrator Desa" }
-    OtpSendResponse:
-      type: object
-      properties:
-        message: { type: string }
-        debug_otp: { type: string, nullable: true, description: "Hanya di local/testing. Kosong di produksi." }
     Message:
       type: object
       properties:

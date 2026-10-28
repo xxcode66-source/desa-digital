@@ -2,8 +2,6 @@ package com.desa.digital.core.network
 
 import com.desa.digital.core.network.dto.LoginRequest
 import com.desa.digital.core.network.dto.LoginResponse
-import com.desa.digital.core.network.dto.OtpRequest
-import com.desa.digital.core.network.dto.OtpSendResponse
 import com.desa.digital.core.network.dto.RegisterRequest
 import com.desa.digital.core.network.dto.RegisterResponse
 import com.desa.digital.core.network.dto.UserDto
@@ -14,8 +12,8 @@ import retrofit2.http.POST
 
 /**
  * Kontrak API backend Laravel (lihat docs/openapi.yaml).
- * Fase 0: health/login/me/logout. Fase 1: registrasi NIK + OTP + logout-all.
- * Endpoint surat/PBB/UMKM/pengaduan menyusul pada fasenya masing-masing.
+ * Fase 0: health/login/me/logout. Fase 1: registrasi NIK + consent + logout-all
+ * (tanpa OTP/SMS pihak ketiga). Endpoint surat/PBB/UMKM/pengaduan menyusul pada fasenya.
  */
 interface ApiService {
     @GET("api/health")
@@ -23,9 +21,6 @@ interface ApiService {
 
     @POST("api/login")
     suspend fun login(@Body body: LoginRequest): LoginResponse
-
-    @POST("api/register/otp")
-    suspend fun sendRegisterOtp(@Body body: OtpRequest): OtpSendResponse
 
     @POST("api/register")
     suspend fun register(@Body body: RegisterRequest): RegisterResponse

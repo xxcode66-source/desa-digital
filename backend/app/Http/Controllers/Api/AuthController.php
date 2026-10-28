@@ -1,7 +1,7 @@
 <?php
 // Fase 0 fondasi: login token-based via Sanctum + profil + logout.
-// Fase 1 (PEMBANGUNAN.md 4.1 & 5): registrasi NIK + OTP verifikasi nomor HP,
-// persetujuan data (consent), dan logout-all. Verifikasi identitas tetap oleh
+// Fase 1 (PEMBANGUNAN.md 4.1 & 5): registrasi NIK + persetujuan data (consent),
+// dan logout-all. TANPA OTP/SMS pihak ketiga. Verifikasi identitas dilakukan
 // operator di panel Filament (status pending -> verified/rejected).
 namespace App\Http\Controllers\Api;
 
@@ -9,7 +9,6 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Rules\NikValid;
 use App\Services\AuditLogger;
-use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -29,14 +28,6 @@ class AuthController extends Controller
             return response()->json(['message' => 'Nomor HP atau password salah.'], 401);
         }
 
-        // Nomor HP harus terverifikasi OTP sebelum token diberikan.
-        if (!$user->isPhoneVerified()) {
-            return response()->json([
-                'message' => 'Nomor HP belum diverifikasi. Silakan lengkapi verifikasi.',
-                'code' => 'phone_unverified',
-            ], 403);
-        }
-
         AuditLogger::record('auth.login', $user, 'Login berhasil ke aplikasi warga.');
 
         return response()->json([
@@ -46,35 +37,11 @@ class AuthController extends Controller
     }
 
     /**
-     * Kirim OTP untuk registrasi. Nomor belum boleh terdaftar. Kode disimpan ter-hash;
-     * only returned in local/testing untuk memudahkan uji end-to-end tanpa gateway WA/SMS.
+     * Registrasi warga: validasi NIK + consent, buat user status pending + role 'warga'.
+     * Nomor HP tidak diverifikasi via OTP (tanpa gateway berbayar); identitas diperiksa
+     * operator di panel. Token diberikan agar warga bisa login & memantau status verifikasinya.
      */
-    public function sendRegisterOtp(Request $request, OtpService $otp)
-    {
-        $data = $request->validate([
-            'phone' => [
-                'required', 'string', 'regex:/^(\+?62|0)8[1-9][0-9]{6,11}$/',
-                Rule::unique('users', 'phone'),
-            ],
-        ]);
-
-        $phone = $this->normalizePhone($data['phone']);
-        $code = $otp->issue($phone, 'register');
-
-        $payload = ['message' => 'Kode verifikasi telah dikirim.'];
-        if (app()->environment(['local', 'testing'])) {
-            $payload['debug_otp'] = $code; // JANGAN di produksi.
-        }
-
-        return response()->json($payload);
-    }
-
-    /**
-     * Registrasi warga: validasi NIK + OTP + consent, buat user status pending,
-     * role 'warga', catat consent & verifikasi nomor. Token diberikan agar warga bisa
-     * login & memantau status verifikasinya (fitur terbatas sampai operator menyetujui).
-     */
-    public function register(Request $request, OtpService $otp)
+    public function register(Request $request)
     {
         $data = $request->validate([
             'village_id' => ['required', 'integer', Rule::exists('villages', 'id')],
@@ -84,26 +51,17 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'rt' => ['nullable', 'string', 'max:5'],
             'rw' => ['nullable', 'string', 'max:5'],
-            'otp_code' => ['required', 'string', 'digits:6'],
             'consent' => ['accepted'],
         ], [
             'nik.digits' => 'NIK harus 16 digit angka.',
             'nik.unique' => 'NIK sudah terdaftar.',
             'phone.unique' => 'Nomor HP sudah terdaftar.',
             'phone.regex' => 'Format nomor HP tidak valid (contoh: 081234567890).',
-            'otp_code.digits' => 'Kode verifikasi harus 6 digit.',
             'consent.accepted' => 'Anda harus menyetujui persetujuan penggunaan data.',
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
         ]);
 
         $phone = $this->normalizePhone($data['phone']);
-
-        if (!$otp->verify($phone, $data['otp_code'], 'register')) {
-            return response()->json([
-                'message' => 'Kode verifikasi salah atau sudah kedaluwarsa.',
-                'errors' => ['otp_code' => ['Kode verifikasi salah atau sudah kedaluwarsa.']],
-            ], 422);
-        }
 
         $user = User::create([
             'village_id' => $data['village_id'],
@@ -114,7 +72,6 @@ class AuthController extends Controller
             'rt' => $data['rt'] ?? null,
             'rw' => $data['rw'] ?? null,
             'status' => User::STATUS_PENDING,
-            'phone_verified_at' => now(),
             'consent_given_at' => now(),
             'terms_version' => config('desa.terms_version'),
         ]);

@@ -22,17 +22,10 @@ class UserFactory extends Factory
             'status' => 'pending',
             'rt' => fake()->numerify('##'),
             'rw' => fake()->numerify('#'),
-            // Perekam data mewakili warga yang sudah menuntaskan OTP + consent (Fase 1).
-            'phone_verified_at' => now(),
+            // Perekam data mewakili warga yang sudah memberi consent (Fase 1).
             'consent_given_at' => now(),
             'terms_version' => config('desa.terms_version'),
         ];
-    }
-
-    /** Akun yang nomornya belum diverifikasi OTP (mis. dibuat sepihak oleh operator). */
-    public function unverifiedPhone(): static
-    {
-        return $this->state(fn () => ['phone_verified_at' => null]);
     }
 
     public function verified(): static

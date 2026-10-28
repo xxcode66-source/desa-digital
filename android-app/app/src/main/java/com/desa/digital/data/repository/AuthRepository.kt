@@ -3,7 +3,6 @@ package com.desa.digital.data.repository
 import com.desa.digital.core.data.TokenStore
 import com.desa.digital.core.network.ApiService
 import com.desa.digital.core.network.dto.LoginRequest
-import com.desa.digital.core.network.dto.OtpRequest
 import com.desa.digital.core.network.dto.RegisterRequest
 import com.desa.digital.core.network.dto.UserDto
 import javax.inject.Inject
@@ -11,7 +10,7 @@ import javax.inject.Singleton
 import retrofit2.HttpException
 
 /**
- * Repository autentikasi (Fase 0 fondasi + Fase 1 registrasi/OTP).
+ * Repository autentikasi (Fase 0 fondasi + Fase 1 registrasi).
  * Semua hasil dibungkus [Result]; pesan error diubah ke bahasa Indonesia sederhana.
  */
 @Singleton
@@ -27,11 +26,6 @@ class AuthRepository @Inject constructor(
         resp.user
     }.recoverCatching { throw friendly(it) }
 
-    /** Kirim OTP registrasi. Mengembalikan debug-otp (nullable) untuk dev/testing. */
-    suspend fun sendRegisterOtp(phone: String): Result<String?> = runCatching {
-        api.sendRegisterOtp(OtpRequest(phone = phone)).debugOtp
-    }.recoverCatching { throw friendly(it) }
-
     suspend fun register(
         villageId: Long,
         nik: String,
@@ -40,7 +34,6 @@ class AuthRepository @Inject constructor(
         password: String,
         rt: String?,
         rw: String?,
-        otpCode: String,
     ): Result<UserDto> = runCatching {
         val resp = api.register(
             RegisterRequest(
@@ -52,7 +45,6 @@ class AuthRepository @Inject constructor(
                 passwordConfirmation = password,
                 rt = rt?.ifBlank { null },
                 rw = rw?.ifBlank { null },
-                otpCode = otpCode,
             ),
         )
         tokenStore.token = resp.token
@@ -72,7 +64,7 @@ class AuthRepository @Inject constructor(
     /** Terjemahkan error teknis ke pesan yang dimengerti warga (PEMBANGUNAN.md §6). */
     private fun friendly(t: Throwable): Throwable = when {
         t is HttpException && t.code() == 403 ->
-            Exception("Nomor HP belum diverifikasi. Selesaikan verifikasi dulu.")
+            Exception("Akses ditolak. Periksa kembali data Anda.")
         t is HttpException && t.code() == 401 ->
             Exception("Nomor HP atau password salah.")
         t is HttpException && t.code() == 429 ->

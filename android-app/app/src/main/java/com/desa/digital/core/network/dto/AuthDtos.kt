@@ -16,18 +16,6 @@ data class LoginResponse(
 )
 
 @Serializable
-data class OtpRequest(
-    val phone: String,
-)
-
-@Serializable
-data class OtpSendResponse(
-    val message: String = "",
-    // Hanya terisi di environment local/testing backend; null di produksi.
-    @SerialName("debug_otp") val debugOtp: String? = null,
-)
-
-@Serializable
 data class RegisterRequest(
     @SerialName("village_id") val villageId: Long,
     val nik: String,
@@ -37,7 +25,6 @@ data class RegisterRequest(
     @SerialName("password_confirmation") val passwordConfirmation: String,
     val rt: String? = null,
     val rw: String? = null,
-    @SerialName("otp_code") val otpCode: String,
     val consent: Boolean = true,
 )
 
@@ -57,7 +44,6 @@ data class UserDto(
     val rt: String? = null,
     val rw: String? = null,
     @SerialName("village_id") val villageId: Long? = null,
-    @SerialName("phone_verified_at") val phoneVerifiedAt: String? = null,
     val roles: List<RoleDto> = emptyList(),
 )
 

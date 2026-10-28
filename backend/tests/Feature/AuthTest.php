@@ -1,5 +1,5 @@
 <?php
-// Test fondasi Fase 0: login Sanctum + proteksi auth + profil. Registrasi/OTP di Fase 1.
+// Test fondasi Fase 0: login Sanctum + proteksi auth + profil. Registrasi (tanpa OTP) di Fase 1.
 
 namespace Tests\Feature;
 
