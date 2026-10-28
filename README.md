@@ -6,16 +6,17 @@ Laravel** dengan panel operator/admin. Prinsip inti & aturan fase (Fase 0–6,
 RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 [`PEMBANGUNAN.md`](PEMBANGUNAN.md) — baca file itu terlebih dahulu.
 
-> Status: **Fase 0 (Setup) selesai.** Repo sudah berupa proyek nyata yang bisa
-> di-build, bukan lagi kumpulan file skeleton yatim.
+> Status: **Fase 0 (Setup) TUNTAS.** Fondasi nyata: backend buildable + panel admin
+> Filament terpasang, Android menghasilkan APK, ada CI, ERD, API spec, & panduan desain.
 
 ## Struktur
 
 ```
 desa-digital/
+├── .github/workflows/ci.yml     # CI: backend (phpunit) + android (assembleDebug)
 ├── android-app/                 # Proyek Gradle Kotlin/Compose/Hilt (Fase 0)
-├── backend/                     # Laravel 12 + Sanctum (Fase 0)
-├── docs/                        # OpenAPI spec awal
+├── backend/                     # Laravel 12 + Sanctum + Filament (Fase 0)
+├── docs/                        # openapi.yaml, ERD.md, UI-DESIGN.md
 ├── PEMBANGUNAN.md               # Sumber kebenaran rencana & aturan fase
 ├── setup_monorepo.sh            # Bootstrap backend (+ opsional build APK)
 └── build_zip.py                 # Arsip sumber (exclude artefak build)
@@ -31,8 +32,10 @@ desa-digital/
 - Model `User/Village/Role/AuditLog`, service `AuditLogger`, `RoleSeeder`.
 - Route API: `GET /api/health`, `POST /api/login`, `GET /api/me`, `POST /api/logout`.
 - **9 test phpunit hijau** (Auth + AuditLogger) dengan SQLite in-memory.
-- Filament (panel operator) sengaja **ditunda ke Fase 1+** — bukan bagian daftar
-  deliverable Fase 0, dan layarnya bergantung fitur bisnis tiap fase.
+- **Panel admin Filament v5** (base): provider `Admin` di `/admin` + Dashboard,
+  warna brand emerald. Kolom `email` nullable di `users` utk login staff/operator.
+  RBAC & resource fitur (verifikasi warga, antrean surat, dsb.) **sengaja belum** —
+  menyusul Fase 1+ sesuai aturan satu fase per sesi.
 
 ### Android (`android-app/`)
 - Toolchain: **AGP 9.1.0 + Kotlin 2.3.20 + Gradle 9.6 + Hilt 2.60.1** (built-in Kotlin,

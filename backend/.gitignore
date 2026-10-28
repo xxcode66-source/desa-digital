@@ -3,6 +3,12 @@
 /public/build
 /public/hot
 /public/storage
+# Aset Filament/Livewire yang di-generate ulang oleh `php artisan filament:assets`
+/public/css/filament
+/public/js/filament
+/public/fonts/filament
+/storage/app/livewire
+/storage/framework/testing
 /storage/*.key
 /storage/pail
 /vendor

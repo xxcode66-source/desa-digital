@@ -1,0 +1,77 @@
+name: CI
+
+# Fase 0: validasi kedua sisi repo tiap push/PR.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend (Laravel 12 + PHPUnit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          ini-values: memory_limit=-1
+          extensions: bcmath, curl, dom, fileinfo, gd, intl, mbstring, pdo_sqlite, sqlite3, zip
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment (sqlite)
+        run: |
+          cp .env.example .env
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          grep -q '^DB_DATABASE=' .env || echo 'DB_DATABASE=database/database.sqlite' >> .env
+          touch database/database.sqlite
+          php artisan key:generate --force
+
+      - name: Migrate & seed
+        run: php artisan migrate:fresh --seed --force
+
+      - name: Publish Filament assets
+        run: php artisan filament:assets
+
+      - name: Run tests
+        run: php artisan test
+
+  android:
+    name: Android (Assemble Debug)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble debug APK
+        run: chmod +x ./gradlew && ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: ignore

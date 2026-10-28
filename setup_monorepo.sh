@@ -50,6 +50,9 @@ php artisan key:generate --force
 info "php artisan migrate --seed"
 php artisan migrate:fresh --seed --force
 
+info "Publikasi aset Filament (panel admin)"
+php artisan filament:assets
+
 info "Cek route API"
 php artisan route:list --path=api || true
 

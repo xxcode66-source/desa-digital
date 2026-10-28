@@ -7,8 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, HasApiTokens, Notifiable;
 
@@ -17,7 +19,7 @@ class User extends Authenticatable
     public const STATUS_REJECTED = 'rejected';
 
     protected $fillable = [
-        'village_id', 'nik', 'name', 'phone', 'password', 'status', 'rt', 'rw',
+        'village_id', 'nik', 'name', 'phone', 'email', 'password', 'status', 'rt', 'rw',
     ];
 
     protected $hidden = ['password', 'remember_token', 'nik'];
@@ -54,5 +56,12 @@ class User extends Authenticatable
     public function isVerified(): bool
     {
         return $this->status === self::STATUS_VERIFIED;
+    }
+
+    // Fase 0: panel Filament sudah bisa diakses (base). Pembatasan peran/RBAC
+    // yang sebenarnya (operator vs admin, verifikasi) baru diimplement Fase 1.
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return true;
     }
 }

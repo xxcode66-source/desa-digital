@@ -1,14 +1,142 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
   title: API Aplikasi Desa Digital
-  version: 1.0.0
+  version: 0.1.0-fase0
+  description: |
+    Spesifikasi API Fase 0 (fondasi): health check + autentikasi token via Laravel Sanctum.
+    Endpoint fitur bisnis (surat, PBB, UMKM, pengaduan) sengaja BELUM ada di sini —
+    masing-masing menyusul pada fasenya sesuai PEMBANGUNAN.md §8 (aturan satu fase per sesi).
+    Auth: header `Authorization: Bearer <token>` (Sanctum personal access token).
+servers:
+  - url: /api
+    description: Basis path API Laravel
+
+tags:
+  - name: System
+  - name: Auth
+
 paths:
-  /auth/login:
+  /health:
+    get:
+      tags: [System]
+      summary: Cek kesiapan layanan
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  app: { type: string, example: "Desa Digital" }
+                  status: { type: string, example: "ok" }
+
+  /login:
     post:
-      summary: Login Warga / Perangkat Desa
-  /letters:
+      tags: [Auth]
+      summary: Login (nomor HP + password) -> token Sanctum
+      description: Rate-limited 10 request/menit. Registrasi NIK + OTP + verifikasi operator menyusul di Fase 1.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, password]
+              properties:
+                phone: { type: string, example: "08123456789" }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, description: Personal access token Sanctum }
+                  user: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Nomor HP / password salah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '422':
+          description: Validasi input gagal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '429':
+          description: Terlalu banyak percobaan (throttle)
+
+  /me:
+    get:
+      tags: [Auth]
+      summary: Profil pengguna yang sedang login (beserta roles)
+      operationId: me
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Data profil
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Tidak terautentikasi
+
+  /logout:
     post:
-      summary: Pengajuan Surat Baru
-  /pbb/check:
-    post:
-      summary: Cek Tagihan PBB via NOP
+      tags: [Auth]
+      summary: Cabut token aktif
+      operationId: logout
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Berhasil keluar
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401':
+          description: Tidak terautentikasi
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        village_id: { type: integer, nullable: true, description: "Semua data terikat desa (prinsip multi-desa)." }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, format: email, nullable: true, description: "Untuk akun perangkat desa/operator." }
+        status: { type: string, enum: [pending, verified, rejected] }
+        rt: { type: string, nullable: true }
+        rw: { type: string, nullable: true }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+    Role:
+      type: object
+      properties:
+        name: { type: string, example: "admin" }
+        label: { type: string, example: "Administrator Desa" }
+    Message:
+      type: object
+      properties:
+        message: { type: string }
+    ValidationError:
+      type: object
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
