@@ -49,7 +49,7 @@ class ComplaintResource extends Resource
         $query = parent::getEloquentQuery()->with(['user:id,name', 'village:id,name']);
         $actor = Filament::auth()->user();
 
-        if ($actor && !$actor->isAdmin()) {
+        if ($actor instanceof \App\Models\User && ! $actor->isAdmin()) {
             $query->where('village_id', $actor->village_id);
         }
 

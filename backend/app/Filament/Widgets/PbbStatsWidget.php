@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class PbbStatsWidget extends StatsOverviewWidget
 {
-    protected static ?int $sort = 1;
+    protected static ?int $sort = 4;
 
     protected function getStats(): array
     {

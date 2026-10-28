@@ -46,7 +46,7 @@ class ProductReportResource extends Resource
         $query = parent::getEloquentQuery()->with(['reporter:id,name', 'product:id,name', 'shop:id,name', 'village:id,name', 'handler:id,name']);
         $actor = Filament::auth()->user();
 
-        if ($actor && !$actor->isAdmin()) {
+        if ($actor instanceof \App\Models\User && ! $actor->isAdmin()) {
             $query->where('village_id', $actor->village_id);
         }
 

@@ -51,7 +51,7 @@ class PbbObjectResource extends Resource
         $query = parent::getEloquentQuery()->withCount('bills');
         $actor = Filament::auth()->user();
 
-        if ($actor && !$actor->isAdmin()) {
+        if ($actor instanceof \App\Models\User && ! $actor->isAdmin()) {
             $query->where('village_id', $actor->village_id);
         }
 

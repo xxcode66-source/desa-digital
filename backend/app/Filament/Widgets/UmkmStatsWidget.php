@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class UmkmStatsWidget extends StatsOverviewWidget
 {
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 5;
 
     protected function getStats(): array
     {

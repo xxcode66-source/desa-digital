@@ -107,4 +107,18 @@ class UmkmPolicyTest extends TestCase
         $this->assertTrue(Gate::forUser($this->staff('operator'))->allows('handle', $report));
         $this->assertFalse(Gate::forUser($this->staff('operator', Village::factory()->create()))->allows('handle', $report));
     }
+
+    public function test_product_policy_survives_partially_loaded_shop(): void
+    {
+        // Regresi crash: kolom relasi Filament 'shop.name' meng-eager-load shop hanya
+        // (id,name) -> Shop->status null. ProductPolicy::view harus tetap jalan (tanpa
+        // TypeError) dan petugas desa tetap boleh melihat produknya.
+        $operator = $this->staff('operator');
+        $shop = Shop::factory()->active()->create(['village_id' => $this->village->id]);
+        $product = Product::factory()->create(['shop_id' => $shop->id, 'village_id' => $this->village->id]);
+
+        $product->setRelation('shop', Shop::select('id', 'name')->findOrFail($shop->id));
+
+        $this->assertTrue(Gate::forUser($operator)->allows('view', $product));
+    }
 }

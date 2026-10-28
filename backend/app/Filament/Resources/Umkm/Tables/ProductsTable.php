@@ -6,6 +6,7 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Katalog produk UMKM untuk peninjauan petugas (PEMBANGUNAN.md 4.4). Produk dibuat & dikelola
@@ -33,6 +34,9 @@ class ProductsTable
                 TextColumn::make('created_at')->label('Ditambahkan')->dateTime('d M Y')->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
+            // Muat toko penuh agar ProductPolicy (isPubliclyVisible) punya kolom status,
+            // bukan hanya id+name hasil eager-load parsial dari kolom relasi 'shop.name'.
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('shop'))
             ->filters([
                 TernaryFilter::make('is_available')->label('Ketersediaan')->placeholder('Semua')->trueLabel('Tersedia')->falseLabel('Habis'),
             ])

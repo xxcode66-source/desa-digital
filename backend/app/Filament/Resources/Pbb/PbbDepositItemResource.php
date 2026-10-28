@@ -50,7 +50,7 @@ class PbbDepositItemResource extends Resource
         $query = parent::getEloquentQuery()->with(['batch.collector:id,name', 'bill.object', 'reviewer:id,name']);
         $actor = Filament::auth()->user();
 
-        if ($actor && !$actor->isAdmin()) {
+        if ($actor instanceof \App\Models\User && ! $actor->isAdmin()) {
             $query->whereHas('batch', fn (Builder $b) => $b->where('village_id', $actor->village_id));
         }
 

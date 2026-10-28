@@ -49,7 +49,7 @@ class ShopResource extends Resource
         $query = parent::getEloquentQuery()->with(['owner:id,name', 'village:id,name', 'stats']);
         $actor = Filament::auth()->user();
 
-        if ($actor && !$actor->isAdmin()) {
+        if ($actor instanceof \App\Models\User && ! $actor->isAdmin()) {
             $query->where('village_id', $actor->village_id);
         }
 

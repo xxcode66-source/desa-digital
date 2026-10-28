@@ -46,7 +46,7 @@ class LetterTypeResource extends Resource
         $query = parent::getEloquentQuery();
         $actor = Filament::auth()->user();
 
-        if ($actor && !$actor->isAdmin()) {
+        if ($actor instanceof \App\Models\User && ! $actor->isAdmin()) {
             $query->where(fn (Builder $q) => $q->whereNull('village_id')
                 ->orWhere('village_id', $actor->village_id));
         }

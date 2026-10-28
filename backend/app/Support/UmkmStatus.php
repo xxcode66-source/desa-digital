@@ -43,8 +43,12 @@ final class UmkmStatus
         return in_array($to, self::SHOP_TRANSITIONS[$from] ?? [], true);
     }
 
-    /** Hanya toko aktif & tidak disembunyikan yang boleh muncul ke publik. */
-    public static function isPubliclyVisible(string $status, bool $isHidden): bool
+    /**
+     * Hanya toko aktif & tidak disembunyikan yang boleh muncul ke publik.
+     * $status boleh null: terjadi saat relasi shop di-eager-load sebagian (mis. kolom
+     * Filament 'shop.name' hanya memuat id+name). Status tak diketahui => tidak tampil.
+     */
+    public static function isPubliclyVisible(?string $status, bool $isHidden): bool
     {
         return $status === self::SHOP_ACTIVE && !$isHidden;
     }

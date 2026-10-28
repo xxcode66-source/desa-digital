@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Pbb\Tables;
 
 use App\Models\PbbObject;
+use App\Models\User;
 use App\Services\PbbImportService;
 use App\Support\PbbStatus;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
@@ -41,7 +43,7 @@ class PbbObjectsTable
                 SelectFilter::make('rt')
                     ->label('RT')
                     ->options(fn (): array => PbbObject::query()
-                        ->where('village_id', auth()->user()?->village_id)
+                        ->where('village_id', self::actor()?->village_id)
                         ->whereNotNull('rt')->distinct()->orderBy('rt')->pluck('rt', 'rt')->all()),
             ])
             ->recordActions([
@@ -54,13 +56,23 @@ class PbbObjectsTable
             ->emptyStateHeading('Belum ada objek pajak — import CSV dulu');
     }
 
+    /**
+     * User terautentikasi sebagai App\Models\User (anotasi tipe untuk static analysis).
+     */
+    private static function actor(): ?User
+    {
+        $user = Filament::auth()->user();
+
+        return $user instanceof User ? $user : null;
+    }
+
     private static function importAction(): Action
     {
         return Action::make('import')
             ->label('Import CSV PBB')
             ->icon('heroicon-o-arrow-up-tray')
             ->color('gray')
-            ->visible(fn (): bool => auth()->user()?->hasAnyRole(['operator', 'kades', 'admin']) ?? false)
+            ->visible(fn (): bool => self::actor()?->hasAnyRole(['operator', 'kades', 'admin']) ?? false)
             ->modalHeading('Import database PBB dari CSV')
             ->modalDescription('Header wajib: nop, tahun, jumlah. Opsional: denda, nama_wp, alamat, rt, rw, luas_tanah, luas_bangunan. Baris yang sudah ada diperbarui tanpa mengubah status tagihan.')
             ->modalSubmitActionLabel('Import')
@@ -86,10 +98,18 @@ class PbbObjectsTable
 
                 $content = (string) file_get_contents($temporaryPath);
 
+                $actor = self::actor();
+                if (! $actor) {
+                    @unlink($temporaryPath);
+                    Notification::make()->danger()->title('Sesi berakhir, silakan masuk kembali.')->send();
+
+                    return;
+                }
+
                 try {
                     $log = app(PbbImportService::class)->importFromString(
-                        (int) auth()->user()->village_id,
-                        auth()->user(),
+                        (int) $actor->village_id,
+                        $actor,
                         $content,
                         $file->getClientOriginalName(),
                     );
