@@ -11,6 +11,7 @@ use App\Models\Village;
 use App\Services\LetterWorkflow;
 use App\Support\LetterStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class LetterWorkflowTest extends TestCase
@@ -24,6 +25,8 @@ class LetterWorkflowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Storage::fake('local'); // DONE memicu pembuatan PDF; jangan tulis disk asli.
 
         $this->wf = app(LetterWorkflow::class);
         $this->village = Village::factory()->create();

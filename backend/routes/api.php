@@ -44,6 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/letters/{letter}', [LetterController::class, 'show']);
     Route::put('/letters/{letter}', [LetterController::class, 'update']);
     Route::get('/letters/{letter}/attachments/{attachment}', [LetterController::class, 'attachment']);
+    Route::get('/letters/{letter}/pdf', [LetterController::class, 'pdf']);
 
     // Fase 3 — Pengaduan (warga): kategori, ajukan, daftar milik sendiri, lacak, balas, foto.
     Route::get('/complaints/categories', [ComplaintController::class, 'categories']);

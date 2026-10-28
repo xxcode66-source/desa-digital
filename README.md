@@ -14,7 +14,8 @@ RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 > registrasi NIK, PIN/biometrik, wizard surat dari skema, lacak status & perbaikan, formulir
 > pengaduan + foto + lacak & balasan, cek NOP, klaim kepemilikan + foto, "NOP saya" &
 > tunggakan, slip setoran RT/kolektor, marketplace UMKM + chat WhatsApp + toko saya),
-> CI, ERD, API spec, & panduan desain.
+> cetak **PDF surat siap-cetak (berkop desa + QR anti-pemalsuan)** dari backend & unduh di
+> aplikasi, CI, ERD, API spec, & panduan desain.
 > Registrasi **tanpa OTP/SMS berbayar** — verifikasi identitas cukup oleh operator desa.
 > **Tidak ada pembayaran di aplikasi** — status `lunas` PBB hanya verifikasi internal desa;
 > transaksi UMKM tetap offline (WhatsApp hanyalah jembatan ke penjual).
@@ -89,6 +90,11 @@ desa-digital/
 - API warga: jenis surat, ajukan (multipart, maks 5 lampiran, MIME/ukuran dibatasi config),
   lacak, unduh lampiran (disk privat), perbaiki surat bertanda — hanya warga `verified`
   (`LetterPolicy`), throttle per endpoint. Verifikasi & tanda tangan via panel, bukan API.
+- **PDF siap-cetak + QR**: saat surat mencapai `selesai`, `LetterWorkflow` memanggil
+  `LetterPdfService` (DomPDF + `chillerlan/php-qrcode`) membangkitkan berkas **berkop desa**
+  (dari `Village.settings`/logo) + isi formulir + blok tanda tangan + **kode QR** berisi tautan
+  verifikasi publik `public_token`. Disimpan di disk privat; diunduh warga via
+  `GET /api/letters/{letter}/pdf` dan petugas via tautan cetak di panel Filament.
 - **70 test phpunit hijau** (mesin status, penomoran anti-dup + custom format, workflow,
   API submit/lacak/perbaikan/verifikasi publik, policy, smoke panel Filament).
 - Filament: `LetterTypeResource` (CRUD jenis + editor skema dinamis) dan `LetterResource`
@@ -101,6 +107,8 @@ desa-digital/
 - Unggah lampiran via photo picker (maks 5, preview Coil) → multipart `data[key]` +
   `attachments[]`; lacak status (daftar + detail + riwayat lengkap), antrean masuk dari Beranda
   ("Ajukan Surat"). Pesan error teknis diterjemahkan ke bahasa warga.
+- **Unduh / Lihat PDF Surat** pada halaman lacak (hanya tampil saat `selesai`): unduh berkas
+  ke cache lewat jalur ter-autentikasi, lalu buka di aplikasi pembaca PDF via `FileProvider`.
 
 ## Fase 3 yang sudah nyata (Pengaduan)
 
@@ -198,6 +206,19 @@ desa-digital/
   detail toko & produk dengan **tombol Chat WhatsApp** (buka `wa.me` terisi), **Toko Saya**
   (daftar produk + statistik dilihat/klik WA), daftar/edit toko (foto profil), tambah/edit produk
   (foto maks 5 via photo picker), lapor produk/toko. Entri Beranda ("UMKM").
+
+## Penguatan (hardening) pasca-Fase 5
+
+Sebelum lanjut ke Fase 6, Fase 0–5 diaudit & dipertajam agar benar-benar siap lapangan:
+- **Surat PDF + QR diaktifkan** — sebelumnya `pdf_path` tak pernah terisi & QR tak dibuat meski
+  dijanjikan di UI/spesifikasi. Kini dibangkitkan otomatis saat `selesai` (DomPDF sudah
+  terpasang, QR memakai `chillerlan/php-qrcode` bawaan Filament — tanpa paket baru), plus
+  unduh ter-autentikasi di API & tautan cetak di panel + tombol **Unduh PDF** di Android.
+- **Perbaikan logika UMKM** — folder foto toko saat daftar kini memakai id toko asli (bukan
+  `new`), dan sortir "terdekat" pakai `CASE WHEN` portabel (sebelumnya `CAST` khusus SQLite yang
+  bisa gagal di MySQL/PostgreSQL).
+- `versionName` APK disinkronkan (0.6.0-fase5). **Total 203 test phpunit hijau** (547 assert),
+  `assembleDebug` sukses.
 
 ## Reference fase berikutnya (JANGAN dibangun sekarang)
 Stub lama fitur yang belum dibangun dulu disimpan di folder *reference* agar aturan

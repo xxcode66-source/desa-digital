@@ -60,8 +60,10 @@ class UmkmController extends Controller
                 ->orderByDesc('shop_stats.views_count')
                 ->orderByDesc('shops.id');
         } elseif ($sort === 'terdekat' && $user->rt !== null && $user->rt !== '') {
-            $query->orderByRaw('ABS(CAST(shops.rt AS INTEGER) - ?) IS NULL', [$user->rt])
-                ->orderByRaw('ABS(CAST(shops.rt AS INTEGER) - ?)', [$user->rt])
+            // "Terdekat" di skala desa = RT sendiri dulu, lalu RW sendiri, lalu terbaru.
+            // CASE WHEN standar SQL — portabel SQLite/MySQL/PostgreSQL (hindari CAST yang tidak standar).
+            $query->orderByRaw('CASE WHEN shops.rt = ? THEN 0 ELSE 1 END', [$user->rt])
+                ->orderByRaw('CASE WHEN shops.rw = ? THEN 0 ELSE 1 END', [$user->rw])
                 ->orderByDesc('shops.id');
         } else {
             $query->latest('shops.created_at')->orderByDesc('shops.id');
@@ -203,12 +205,12 @@ class UmkmController extends Controller
         $shop = new Shop($data);
         $shop->village_id = $user->village_id;
         $shop->user_id = $user->id;
+        $shop->save(); // simpan dulu agar id tersedia utk folder foto toko
 
         if ($file = $request->file('photo')) {
             $this->storeShopPhoto($shop, $file);
+            $shop->save();
         }
-
-        $shop->save();
 
         AuditLogger::record('umkm.shop.created', $shop, 'Pelaku UMKM mendaftarkan toko.', ['category' => $shop->category]);
 
@@ -386,7 +388,7 @@ class UmkmController extends Controller
 
     private function storeShopPhoto(Shop $shop, $file): void
     {
-        $path = sprintf('umkm/shops/%s/%s.%s', $shop->id ?: 'new', (string) Str::uuid(), $file->getClientOriginalExtension() ?: 'jpg');
+        $path = sprintf('umkm/shops/%d/%s.%s', $shop->id, (string) Str::uuid(), $file->getClientOriginalExtension() ?: 'jpg');
         Storage::disk('local')->put($path, file_get_contents($file->getRealPath()));
         $shop->forceFill(['disk' => 'local', 'photo_path' => $path, 'photo_name' => $file->getClientOriginalName()]);
     }

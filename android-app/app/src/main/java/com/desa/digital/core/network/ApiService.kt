@@ -30,6 +30,7 @@ import com.desa.digital.core.network.dto.UmkmWaResponse
 import com.desa.digital.core.network.dto.UserDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -85,6 +86,10 @@ interface ApiService {
 
     @GET("api/letters/{id}")
     suspend fun letterDetail(@Path("id") letterId: Long): LetterDataResponse
+
+    /** Unduh PDF surat siap-cetak (berkop + QR). Berkas biner; Authorization dari interceptor. */
+    @GET("api/letters/{id}/pdf")
+    suspend fun letterPdf(@Path("id") letterId: Long): ResponseBody
 
     /** Perbaiki surat berstatus perlu_perbaikan (skema sama dengan submitLetter). */
     @Multipart

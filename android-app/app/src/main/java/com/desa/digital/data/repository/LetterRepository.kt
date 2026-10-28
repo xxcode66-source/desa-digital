@@ -2,14 +2,18 @@ package com.desa.digital.data.repository
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.content.FileProvider
 import com.desa.digital.core.network.ApiService
 import com.desa.digital.core.network.dto.LetterDetailDto
 import com.desa.digital.core.network.dto.LetterSummaryDto
 import com.desa.digital.core.network.dto.LetterTypeDto
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -36,6 +40,21 @@ class LetterRepository @Inject constructor(
 
     suspend fun detail(letterId: Long): Result<LetterDetailDto> = runCatching {
         api.letterDetail(letterId).data
+    }.recoverCatching { throw friendly(it) }
+
+    /**
+     * Unduh PDF siap-cetak ke cache lalu balikkan Uri `content://` (via FileProvider)
+     * agar aman dibuka aplikasi luar di Android N+ (tanpa `file://`). Hanya surat selesai
+     * punya pdf_url; selain itu backend balas 404 -> pesan ramah. (§4.2)
+     */
+    suspend fun downloadPdf(letterId: Long): Result<Uri> = runCatching {
+        val body = api.letterPdf(letterId)
+        withContext(Dispatchers.IO) {
+            val dir = File(context.cacheDir, "pdfs").apply { mkdirs() }
+            val file = File(dir, "surat-$letterId.pdf")
+            body.byteStream().use { input -> file.outputStream().use { input.copyTo(it) } }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        }
     }.recoverCatching { throw friendly(it) }
 
     suspend fun submit(

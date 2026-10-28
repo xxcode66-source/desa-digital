@@ -66,7 +66,8 @@ class LettersTable
                 self::advance('operatorVerify', 'Verifikasi Layak', LetterStatus::OPERATOR, LetterStatus::SIGN, 'process',
                     noteField: true),
                 self::advance('finalize', 'Tanda Tangan & Selesai', LetterStatus::SIGN, LetterStatus::DONE, 'finalize',
-                    description: 'Nomor surat dihasilkan otomatis anti-duplikat dan tautan verifikasi publik (QR) aktif.'),
+                    description: 'Nomor surat dihasilkan otomatis anti-duplikat, PDF berkop + QR verifikasi dibuat & tautan publik aktif.'),
+                self::pdfDownloadAction(),
                 self::repairAction(),
                 self::rejectAction(),
             ])
@@ -98,6 +99,19 @@ class LettersTable
             ->modalSubmitActionLabel('Ya, ' . strtolower($label))
             ->schema($noteField ? [self::noteField(false)] : [])
             ->action(fn (Letter $record, array $data) => self::doTransition($record, $to, $data['note'] ?? null));
+    }
+
+    /** Tautan unduh/cetak PDF surat selesai (guard sesi panel; dibuat saat finalize). */
+    private static function pdfDownloadAction(): Action
+    {
+        return Action::make('downloadPdf')
+            ->label('Unduh / Cetak PDF')
+            ->icon('heroicon-o-document-arrow-down')
+            ->color('info')
+            ->authorize('view')
+            ->visible(fn (Letter $record): bool => $record->status === LetterStatus::DONE && filled($record->pdf_path))
+            ->url(fn (Letter $record): string => route('panel.letter.pdf', $record))
+            ->openUrlInNewTab();
     }
 
     /** Minta perbaikan: staff menandai field mana yang salah (per-field, PEMBANGUNAN.md 4.2). */

@@ -81,6 +81,7 @@ data class LetterDetailDto(
     val editable: Boolean = false,
     @SerialName("submitted_at") val submittedAt: String? = null,
     @SerialName("completed_at") val completedAt: String? = null,
+    @SerialName("pdf_url") val pdfUrl: String? = null,
     val attachments: List<LetterAttachmentDto> = emptyList(),
     val history: List<LetterHistoryDto> = emptyList(),
 )

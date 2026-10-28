@@ -14,8 +14,10 @@ use Illuminate\Support\Str;
  */
 class LetterWorkflow
 {
-    public function __construct(private readonly LetterNumberGenerator $numbers)
-    {
+    public function __construct(
+        private readonly LetterNumberGenerator $numbers,
+        private readonly LetterPdfService $pdf,
+    ) {
     }
 
     public function transition(
@@ -25,7 +27,7 @@ class LetterWorkflow
         ?string $note = null,
         array $flagged = [],
     ): Letter {
-        return DB::transaction(function () use ($letter, $to, $actor, $note, $flagged): Letter {
+        $letter = DB::transaction(function () use ($letter, $to, $actor, $note, $flagged): Letter {
             $from = $letter->status;
 
             if (!LetterStatus::canTransition($from, $to)) {
@@ -76,5 +78,13 @@ class LetterWorkflow
 
             return $letter->refresh();
         });
+
+        // PDF dibuat DI LUAR transaksi: status `selesai` wajib tetap tersimpan walaupun
+        // render/tulis file gagal (LetterPdfService menelan error & mencatat log).
+        if ($to === LetterStatus::DONE) {
+            $this->pdf->generate($letter);
+        }
+
+        return $letter;
     }
 }

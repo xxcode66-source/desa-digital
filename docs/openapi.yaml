@@ -403,6 +403,29 @@ paths:
         '404':
           description: Lampiran tidak ditemukan
 
+  /letters/{letter}/pdf:
+    get:
+      tags: [Letters]
+      summary: Unduh PDF surat siap-cetak (berkop + QR verifikasi)
+      description: |
+        Hanya untuk surat berstatus `selesai` yang sudah dibangkitkan PDF-nya oleh
+        LetterWorkflow (pascakomposisi transisi ke DONE). Pihak yang boleh melihat surat
+        (pemilik / staff desa terkait) bisa mengunduh; respons adalah berkas `application/pdf`
+        dengan kop desa + tanda tangan + kode QR anti-pemalsuan.
+      operationId: downloadLetterPdf
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/LetterId' }]
+      responses:
+        '200':
+          description: Berkas PDF surat siap-cetak
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '403':
+          description: Tidak diizinkan melihat surat ini
+        '404':
+          description: Surat belum selesai / PDF belum tersedia
+
   /complaints:
     get:
       tags: [Complaints, Public]
@@ -1328,6 +1351,11 @@ components:
         editable: { type: boolean, description: "true hanya saat status perlu_perbaikan." }
         submitted_at: { type: string, format: date-time, nullable: true }
         completed_at: { type: string, format: date-time, nullable: true }
+        pdf_url:
+          type: string
+          nullable: true
+          description: "Tautan unduh PDF siap-cetak; terisi hanya saat selesai & PDF sudah dibuat."
+          example: "/api/letters/1/pdf"
         attachments:
           type: array
           items:

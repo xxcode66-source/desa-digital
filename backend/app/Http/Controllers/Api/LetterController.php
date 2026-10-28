@@ -9,6 +9,7 @@ use App\Models\Letter;
 use App\Models\LetterAttachment;
 use App\Models\LetterType;
 use App\Services\AuditLogger;
+use App\Services\LetterPdfService;
 use App\Services\LetterWorkflow;
 use App\Support\LetterFormValidator;
 use App\Support\LetterStatus;
@@ -19,8 +20,10 @@ use Illuminate\Validation\Rule;
 
 class LetterController extends Controller
 {
-    public function __construct(private readonly LetterWorkflow $workflow)
-    {
+    public function __construct(
+        private readonly LetterWorkflow $workflow,
+        private readonly LetterPdfService $pdf,
+    ) {
     }
 
     /** Jenis surat aktif yang tersedia untuk desa warga (bawaan + milik desanya). */
@@ -160,6 +163,20 @@ class LetterController extends Controller
         return response()->download($full, $attachment->original_name ?: basename($attachment->path));
     }
 
+    /** Unduh PDF surat siap-cetak (berkop + QR). Hanya surat selesai & yang boleh melihat. */
+    public function pdf(Request $request, Letter $letter)
+    {
+        $this->authorize('view', $letter);
+        abort_unless($letter->status === LetterStatus::DONE, 404, 'Surat belum selesai.');
+
+        $full = $this->pdf->absolutePath($letter->loadMissing('type'));
+        abort_unless($full !== null, 404, 'PDF surat belum tersedia.');
+
+        return response()->download($full, $this->pdf->downloadName($letter), [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
     private function storeAttachments(Letter $letter, array $files, int $userId, string $kind = 'lampiran'): void
     {
         foreach ($files as $file) {
@@ -196,6 +213,9 @@ class LetterController extends Controller
             'editable' => $letter->isEditableByCitizen(),
             'submitted_at' => $letter->submitted_at?->toIso8601String(),
             'completed_at' => $letter->completed_at?->toIso8601String(),
+            'pdf_url' => ($letter->status === LetterStatus::DONE && $letter->pdf_path)
+                ? "/api/letters/{$letter->id}/pdf"
+                : null,
             'attachments' => $letter->attachments?->map(fn (LetterAttachment $a) => [
                 'id' => $a->id,
                 'name' => $a->original_name,

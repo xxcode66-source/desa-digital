@@ -68,6 +68,15 @@ fun LetterDetailScreen(
                     Spacer(Modifier.height(16.dp))
                 }
 
+                if (d.pdfUrl != null) {
+                    OutlinedButton(
+                        onClick = { viewModel.downloadAndOpenPdf(d.id) },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    ) { Text("Unduh / Lihat PDF Surat") }
+                    Spacer(Modifier.height(16.dp))
+                }
+
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text("Isi Surat", style = MaterialTheme.typography.titleMedium)

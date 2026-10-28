@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Area yang boleh dibagikan FileProvider ke aplikasi luar (pembaca PDF).
+  Hanya subfolder cache "pdfs/" yang diekspos — surat siap-cetak yang baru diunduh.
+-->
+<paths>
+    <cache-path name="pdf" path="pdfs/" />
+</paths>
