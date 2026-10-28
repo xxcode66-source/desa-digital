@@ -12,13 +12,13 @@ aktif (`app/Http/Controllers/Api` dan `database/migrations`) supaya:
 
 | File | Modul | Fase (PEMBANGUNAN.md) |
 |---|---|---|
-| `Controllers/PbbController.php` + `migrations/*_create_pbb_tables.php` | PBB | **Fase 4** |
 | `Controllers/UmkmController.php` + `migrations/*_create_umkm_tables.php` | Marketplace UMKM | **Fase 5** |
 
-> Stub Surat (Fase 2) & Pengaduan (Fase 3) telah **dihapus** — implementasi aslinya sudah
-> hidup: `app/Http/Controllers/Api/Letter*.php` + `Complaint*.php`, model/service/
-> `LetterStatus`/`ComplaintStatus`, migrasi `create_letters_tables` & `create_complaints_tables`
-> aktif, plus panel Filament & 102 test hijau.
+> Stub Surat (Fase 2), Pengaduan (Fase 3), & PBB (Fase 4) telah **dihapus** — implementasi
+> aslinya sudah hidup: `app/Http/Controllers/Api/Letter*.php` + `Complaint*.php` +
+> `PbbController.php`, model/service/`LetterStatus`/`ComplaintStatus`/`PbbStatus`, migrasi
+> `create_letters_tables`, `create_complaints_tables`, & `create_pbb_tables` aktif, plus panel
+> Filament & test hijau.
 
 ## Cara memakai saat fasenya tiba
 1. Pindahkan file kembali ke `app/Http/Controllers/Api/` dan `database/migrations/`.

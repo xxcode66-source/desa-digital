@@ -58,6 +58,42 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Complaint::class);
     }
 
+    /** Klaim kepemilikan NOP yang diajukan warga ini (Fase 4 PBB). */
+    public function pbbClaims(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PbbClaim::class);
+    }
+
+    /** Batch setoran PBB yang disetor oleh RT/kolektor ini (Fase 4 PBB). */
+    public function pbbDepositBatches(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PbbDepositBatch::class, 'collector_id');
+    }
+
+    /** Apakah user ini petugas pemungut PBB (RT atau kolektor). */
+    public function isCollector(): bool
+    {
+        return $this->hasAnyRole(['rt', 'kolektor']);
+    }
+
+    /**
+     * Batas RT utk kolektor ini (dari pivot role 'rt'/'kolektor'). Null = boleh lintas RT
+     * (mis. bendahara/admin yang meninjau, atau kolektor tanpa penugasan RT spesifik).
+     */
+    public function collectorRtScope(): ?string
+    {
+        foreach ($this->roles as $role) {
+            if (in_array($role->name, ['rt', 'kolektor'], true)) {
+                $rt = $role->pivot->scope_rt ?? null;
+                if ($rt !== null && $rt !== '') {
+                    return (string) $rt;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function hasRole(string $roleName): bool
     {
         return $this->roles->contains('name', $roleName);

@@ -9,6 +9,13 @@ import com.desa.digital.core.network.dto.LetterListResponse
 import com.desa.digital.core.network.dto.LetterTypeListResponse
 import com.desa.digital.core.network.dto.LoginRequest
 import com.desa.digital.core.network.dto.LoginResponse
+import com.desa.digital.core.network.dto.PbbBillListResponse
+import com.desa.digital.core.network.dto.PbbClaimDataResponse
+import com.desa.digital.core.network.dto.PbbClaimListResponse
+import com.desa.digital.core.network.dto.PbbDepositBatchDataResponse
+import com.desa.digital.core.network.dto.PbbDepositBatchListResponse
+import com.desa.digital.core.network.dto.PbbMyObjectListResponse
+import com.desa.digital.core.network.dto.PbbNopLookupResponse
 import com.desa.digital.core.network.dto.RegisterRequest
 import com.desa.digital.core.network.dto.RegisterResponse
 import com.desa.digital.core.network.dto.UserDto
@@ -23,6 +30,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.PartMap
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Kontrak API backend Laravel (lihat docs/openapi.yaml).
@@ -103,4 +111,42 @@ interface ApiService {
         @Path("id") complaintId: Long,
         @Body body: ComplaintReplyRequest,
     ): ComplaintDataResponse
+
+    // ---- Fase 4: PBB (warga & kolektor) ----
+
+    /** Cek NOP publik (nama WP disamarkan server). village_id diambil dari profil pengguna. */
+    @GET("api/pbb/cek-nop")
+    suspend fun cekNop(
+        @Query("nop") nop: String,
+        @Query("village_id") villageId: Long,
+    ): PbbNopLookupResponse
+
+    /** Ajukan klaim kepemilikan. parts: nop/note; file: bukti foto (SPPT/surat tanah). */
+    @Multipart
+    @POST("api/pbb/claims")
+    suspend fun submitClaim(
+        @PartMap parts: Map<String, RequestBody>,
+        @Part evidence: MultipartBody.Part,
+    ): PbbClaimDataResponse
+
+    @GET("api/my-pbb-objects")
+    suspend fun myPbbObjects(): PbbMyObjectListResponse
+
+    @GET("api/my-pbb-claims")
+    suspend fun myPbbClaims(): PbbClaimListResponse
+
+    /** Tagihan dalam lingkup RT kolektor untuk dipilih saat menyetor. */
+    @GET("api/pbb/bills")
+    suspend fun collectorBills(@Query("year") year: Int? = null): PbbBillListResponse
+
+    /** Kolektor mengajukan slip setoran. parts: title/note + bills[i][pbb_bill_id]/bills[i][amount_claimed]; file bukti opsional. */
+    @Multipart
+    @POST("api/pbb/deposits")
+    suspend fun submitDeposit(
+        @PartMap parts: Map<String, RequestBody>,
+        @Part evidence: MultipartBody.Part? = null,
+    ): PbbDepositBatchDataResponse
+
+    @GET("api/my-pbb-deposits")
+    suspend fun myPbbDeposits(): PbbDepositBatchListResponse
 }

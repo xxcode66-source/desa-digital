@@ -20,6 +20,12 @@ import com.desa.digital.feature.letter.ui.LetterListScreen
 import com.desa.digital.feature.letter.ui.LetterWizardScreen
 import com.desa.digital.feature.lock.ui.CreatePinScreen
 import com.desa.digital.feature.lock.ui.LockScreen
+import com.desa.digital.feature.pbb.ui.CekNopScreen
+import com.desa.digital.feature.pbb.ui.ClaimFormScreen
+import com.desa.digital.feature.pbb.ui.ClaimListScreen
+import com.desa.digital.feature.pbb.ui.DepositScreen
+import com.desa.digital.feature.pbb.ui.MyNopScreen
+import com.desa.digital.feature.pbb.ui.PbbMenuScreen
 import com.desa.digital.feature.profile.ui.ProfileScreen
 import com.desa.digital.core.session.SessionViewModel.Companion.CREATE_PIN
 import com.desa.digital.core.session.SessionViewModel.Companion.HOME
@@ -39,6 +45,14 @@ const val LETTER_REPAIR = "letters/{letterId}/repair"
 const val COMPLAINTS = "complaints"
 const val COMPLAINT_NEW = "complaints/new"
 const val COMPLAINT_DETAIL = "complaints/{complaintId}"
+
+/** Rute modul PBB Fase 4. */
+const val PBB = "pbb"
+const val PBB_CEK = "pbb/cek-nop"
+const val PBB_MY = "pbb/my-nop"
+const val PBB_CLAIM_NEW = "pbb/claims/new"
+const val PBB_CLAIMS = "pbb/claims"
+const val PBB_DEPOSIT = "pbb/deposit"
 
 private fun letterIdArg() = navArgument("letterId") { type = NavType.LongType }
 private fun complaintIdArg() = navArgument("complaintId") { type = NavType.LongType }
@@ -93,6 +107,7 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 onOpenProfile = { navController.navigate(PROFILE) },
                 onOpenLetters = { navController.navigate(LETTERS) },
                 onOpenComplaints = { navController.navigate(COMPLAINTS) },
+                onOpenPbb = { navController.navigate(PBB) },
             )
         }
         composable(PROFILE) {
@@ -159,6 +174,46 @@ fun AppNavigation(sessionViewModel: SessionViewModel = hiltViewModel()) {
                 complaintId = entry.arguments?.getLong("complaintId") ?: 0L,
                 onBack = { navController.popBackStack() },
             )
+        }
+
+        // ---- Fase 4: PBB ----
+        composable(PBB) {
+            PbbMenuScreen(
+                onBack = { navController.popBackStack() },
+                onCekNop = { navController.navigate(PBB_CEK) },
+                onMyNop = { navController.navigate(PBB_MY) },
+                onNewClaim = { navController.navigate(PBB_CLAIM_NEW) },
+                onMyClaims = { navController.navigate(PBB_CLAIMS) },
+                onDeposit = { navController.navigate(PBB_DEPOSIT) },
+            )
+        }
+        composable(PBB_CEK) {
+            CekNopScreen(onBack = { navController.popBackStack() })
+        }
+        composable(PBB_MY) {
+            MyNopScreen(
+                onBack = { navController.popBackStack() },
+                onNewClaim = { navController.navigate(PBB_CLAIM_NEW) },
+            )
+        }
+        composable(PBB_CLAIM_NEW) {
+            ClaimFormScreen(
+                onBack = { navController.popBackStack() },
+                onDone = {
+                    navController.navigate(PBB_CLAIMS) {
+                        popUpTo(PBB_CLAIM_NEW) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable(PBB_CLAIMS) {
+            ClaimListScreen(
+                onBack = { navController.popBackStack() },
+                onNewClaim = { navController.navigate(PBB_CLAIM_NEW) },
+            )
+        }
+        composable(PBB_DEPOSIT) {
+            DepositScreen(onBack = { navController.popBackStack() })
         }
     }
 }

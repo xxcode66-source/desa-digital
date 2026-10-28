@@ -1,17 +1,21 @@
 openapi: 3.0.3
 info:
   title: API Aplikasi Desa Digital
-  version: 0.4.0-fase3
+  version: 0.5.0-fase4
   description: |
     Spesifikasi API Fase 0 (fondasi) + Fase 1 (Auth & Verifikasi) + Fase 2 (Surat) +
-    Fase 3 (Pengaduan): health check, login, registrasi warga dengan NIK + consent (tanpa
+    Fase 3 (Pengaduan) + Fase 4 (PBB): health check, login, registrasi warga dengan NIK + consent (tanpa
     OTP/SMS pihak ketiga), profil, logout/logout-all, layanan surat dinamis (jenis surat
     berbasis form_schema, pengajuan multipart + lampiran, lacak status, perbaikan per-field),
-    verifikasi keaslian surat publik via QR, dan pengaduan warga (kategori baku, foto bukti +
+    verifikasi keaslian surat publik via QR, pengaduan warga (kategori baku, foto bukti +
     lokasi opsional, kirim anonim, status diterima/diproses/selesai/ditolak, balasan &
-    kronologi, papan publik yang menyamarkan pelapor anonim). Verifikasi & penanganan
-    pengaduan dilakukan staff lewat panel Filament, bukan via API warga. Endpoint fitur
-    bisnis lainnya (PBB, UMKM) menyusul pada fasenya masing-masing sesuai PEMBANGUNAN.md §8
+    kronologi, papan publik yang menyamarkan pelapor anonim), dan PBB/npd (cek NOP publik
+    dengan nama wajib pajak disamarkan + rate limit, klaim kepemilikan dengan foto bukti,
+    "NOP saya" + tunggakan, dan alur setoran RT/kolektor yang dinilai bendahara). Verifikasi
+    klaim, impor database PBB, serta ACC setoran (termasuk ACC sebagian per item) dilakukan
+    staff lewat panel Filament, bukan via API warga. PENTING: tidak ada pembayaran di dalam
+    aplikasi — status `lunas` adalah verifikasi internal desa, bukan bukti pelunasan resmi.
+    Endpoint fitur bisnis lainnya (UMKM) menyusul pada fasenya sesuai PEMBANGUNAN.md §8
     (aturan satu fase per sesi).
     Auth: header `Authorization: Bearer <token>` (Sanctum personal access token).
 servers:
@@ -23,6 +27,7 @@ tags:
   - name: Auth
   - name: Letters
   - name: Complaints
+  - name: Pbb
   - name: Public
 
 paths:
@@ -603,6 +608,255 @@ paths:
         '404':
           description: Foto tidak ditemukan
 
+  /pbb/cek-nop:
+    get:
+      tags: [Pbb, Public]
+      summary: Cek NOP PBB (publik; nama wajib pajak disamarkan)
+      description: |
+        Tanpa login; di-rate-limit (config `desa.throttle.pbb_nop_check`) untuk mencegah
+        scraping/penebakan NOP. NOP dinormalisasi ke digit saja (maks `desa.pbb.nop_max_len`).
+        Mengembalikan objek pajak + ringkasan tagihan dengan `wp_name_masked` (bukan nama
+        lengkap) dan `disclaimer` bahwa info bersifat sementara — pelunasan resmi mengikuti
+        kantor pajak. 404 bila NOP tidak ditemukan di desa tsb.
+      operationId: pbbCekNop
+      parameters:
+        - name: nop
+          in: query
+          required: true
+          schema: { type: string, maxLength: 32 }
+        - name: village_id
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Data objek pajak + tagihan (nama disamarkan)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PbbObjectLookup' }
+        '404':
+          description: NOP tidak ditemukan di desa ini
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '422':
+          description: NOP / desa tidak valid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '429':
+          description: Terlalu banyak permintaan (throttle)
+
+  /pbb/claims:
+    post:
+      tags: [Pbb]
+      summary: "Ajukan klaim kepemilikan NOP (multipart: nop + bukti foto)"
+      description: |
+        Hanya warga berstatus `verified` (Policy `PbbClaim@create`). Bukti berupa satu gambar
+        (SPPT/surat tanah) — MIME & ukuran dibatasi config `desa.pbb`. Klaim baru berstatus
+        `pending` menunggu verifikasi operator di panel. Ditolak (422) bila NOP sudah atas nama
+        pemohon (approved) atau klaim sebelumnya masih pending.
+      operationId: pbbStoreClaim
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [nop, evidence]
+              properties:
+                nop: { type: string, maxLength: 32 }
+                note: { type: string, nullable: true, maxLength: 1000 }
+                evidence: { type: string, format: binary, description: "Foto bukti (JPG/PNG/WebP)." }
+      responses:
+        '201':
+          description: Klaim terkirim, menunggu verifikasi desa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/PbbClaim' }
+        '403':
+          description: Akun belum terverifikasi / bukan warga
+        '422':
+          description: NOP tidak ditemukan / klaim ganda / validasi bukti gagal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+
+  /my-pbb-objects:
+    get:
+      tags: [Pbb]
+      summary: 'NOP saya — objek atas nama warga (klaim disetujui) + ringkasan tunggakan'
+      operationId: pbbMyObjects
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Daftar NOP milik warga beserta tagihannya
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PbbMyObject' }
+        '401':
+          description: Tidak terautentikasi
+
+  /my-pbb-claims:
+    get:
+      tags: [Pbb]
+      summary: Riwayat klaim NOP milik warga (terbaru dulu)
+      operationId: pbbMyClaims
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Daftar klaim milik pemohon
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PbbClaim' }
+        '401':
+          description: Tidak terautentikasi
+
+  /pbb/claims/{claim}/evidence:
+    get:
+      tags: [Pbb]
+      summary: Unduh foto bukti klaim (disk privat)
+      description: Hanya untuk pemilik klaim atau peninjau desa terkait (Policy `PbbClaim@downloadEvidence`).
+      operationId: pbbClaimEvidence
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/PbbClaimId' }]
+      responses:
+        '200':
+          description: Isi berkas bukti
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '403':
+          description: Tidak diizinkan melihat bukti ini
+        '404':
+          description: Bukti tidak ditemukan
+
+  /pbb/bills:
+    get:
+      tags: [Pbb]
+      summary: Tagihan dalam lingkup RT kolektor (untuk memilih NOP yang akan disetor)
+      description: |
+        Hanya RT/kolektor atau petugas desa (`abort_unless` selain itu 403). Ditandai scope `rt`
+        kolektor (dari pivot role) bila ada; filter `year` opsional; maks 100 baris. Menampilkan
+        `nop`, nama WP, dan status tagihan lengkap (bukan versi samaran — khusus petugas).
+      operationId: pbbCollectorBills
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Daftar tagihan lingkup kolektor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    type: object
+                    properties:
+                      scope_rt: { type: string, nullable: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PbbBillFull' }
+        '403':
+          description: Bukan RT/kolektor atau petugas desa
+        '401':
+          description: Tidak terautentikasi
+
+  /pbb/deposits:
+    post:
+      tags: [Pbb]
+      summary: "RT/kolektor mengajukan slip setoran (multipart: isian + foto slip opsional)"
+      description: |
+        Hanya kolektor terverifikasi (Policy `PbbDepositBatch@create`). Rate-limited (config
+        `desa.throttle.pbb_deposit_submit`). Hanya menerima tagihan berstatus `belum_bayar`; tiap
+        tagihan terpilih berpindah ke `disetor_pending` menunggu ACC bendahara di panel. ACC
+        sebagian dilakukan per item oleh bendahara — bukan lewat API ini.
+      operationId: pbbStoreDeposit
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, bills]
+              properties:
+                title: { type: string, maxLength: 150 }
+                note: { type: string, nullable: true, maxLength: 1000 }
+                bills:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  description: "Kirim sebagai field berulang bills[i][pbb_bill_id], bills[i][amount_claimed]."
+                  items:
+                    type: object
+                    required: [pbb_bill_id]
+                    properties:
+                      pbb_bill_id: { type: integer }
+                      amount_claimed: { type: number, nullable: true, minimum: 0 }
+                evidence: { type: string, format: binary, nullable: true, description: "Foto slip setoran (opsional)." }
+      responses:
+        '201':
+          description: Setoran tercatat, menunggu ACC bendahara
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  data: { $ref: '#/components/schemas/PbbDepositBatch' }
+        '403':
+          description: Bukan kolektor terverifikasi
+        '422':
+          description: Validasi isian / tagihan gagal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '429':
+          description: Terlalu sering mengirim (throttle)
+
+  /my-pbb-deposits:
+    get:
+      tags: [Pbb]
+      summary: Daftar slip setoran milik kolektor yang login (terbaru dulu)
+      operationId: pbbMyDeposits
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Riwayat setoran kolektor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PbbDepositBatch' }
+        '401':
+          description: Tidak terautentikasi
+
 components:
   securitySchemes:
     bearerAuth:
@@ -618,6 +872,11 @@ components:
       schema: { type: integer }
     ComplaintId:
       name: complaint
+      in: path
+      required: true
+      schema: { type: integer }
+    PbbClaimId:
+      name: claim
       in: path
       required: true
       schema: { type: integer }
@@ -817,3 +1076,101 @@ components:
           type: array
           description: "Kronologi + balasan (audit, immutabel)."
           items: { $ref: '#/components/schemas/ComplaintTimelineEntry' }
+    PbbBillLookup:
+      type: object
+      description: "Ringkasan tagihan utk cek NOP publik (id tagihan & tahun; tanpa data pribadi tambahan)."
+      properties:
+        id: { type: integer }
+        year: { type: integer, example: 2026 }
+        amount: { type: number, description: "P PBB (rupiah)." }
+        penalty: { type: number, description: "Denda / bunga (rupiah)." }
+        total: { type: number, description: "amount + penalty." }
+        status: { type: string, enum: [belum_bayar, disetor_pending, lunas] }
+        status_label: { type: string, example: "Belum bayar" }
+        is_arrears: { type: boolean, description: "true bila belum lunas." }
+        due_date: { type: string, format: date, nullable: true }
+    PbbBillFull:
+      type: object
+      description: "Tagihan penuh utk petugas/kolektor — menyertakan NOP & nama WP (tidak disamarkan)."
+      allOf:
+        - { $ref: '#/components/schemas/PbbBillLookup' }
+      properties:
+        nop: { type: string }
+        wp_name: { type: string }
+        rt: { type: string, nullable: true }
+    PbbObjectLookup:
+      type: object
+      description: "Hasil cek NOP — nama wajib pajak sengaja disamarkan demi perlindungan data pribadi."
+      properties:
+        nop: { type: string, example: "123456789012345678" }
+        wp_name_masked: { type: string, example: "B*** S*****", description: "Nama WP disamarkan (huruf awal tiap kata)." }
+        address: { type: string, nullable: true }
+        rt: { type: string, nullable: true }
+        rw: { type: string, nullable: true }
+        land_area: { type: number, nullable: true, description: "m2 tanah." }
+        building_area: { type: number, nullable: true, description: "m2 bangunan." }
+        arrears_count: { type: integer, description: "Jumlah tahun yang masih tunggakan." }
+        arrears_total: { type: number, description: "Total tunggakan (pokok + denda)." }
+        bills:
+          type: array
+          items: { $ref: '#/components/schemas/PbbBillLookup' }
+        disclaimer: { type: string, description: "Catatan bahwa info sementara & pelunasan resmi mengikuti kantor pajak." }
+    PbbMyObject:
+      type: object
+      description: "NOP milik warga (klaim disetujui) — data lengkap, termasuk nama WP asli."
+      properties:
+        id: { type: integer }
+        nop: { type: string }
+        wp_name: { type: string }
+        address: { type: string, nullable: true }
+        rt: { type: string, nullable: true }
+        rw: { type: string, nullable: true }
+        arrears_count: { type: integer }
+        arrears_total: { type: number }
+        bills:
+          type: array
+          items: { $ref: '#/components/schemas/PbbBillFull' }
+    PbbClaim:
+      type: object
+      description: "Klaim kepemilikan NOP oleh warga; dinilai operator di panel Filament."
+      properties:
+        id: { type: integer }
+        nop: { type: string }
+        wp_name: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        status: { type: string, enum: [pending, approved, rejected] }
+        status_label: { type: string, example: "Menunggu verifikasi" }
+        note: { type: string, nullable: true, description: "Catatan pemohon." }
+        review_note: { type: string, nullable: true, description: "Alasan/hasil dari peninjau." }
+        has_evidence: { type: boolean }
+        evidence_url: { type: string, nullable: true, example: "/api/pbb/claims/1/evidence" }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+    PbbDepositItem:
+      type: object
+      description: "Satu tagihan dalam slip setoran; ACC sebagian dilakukan bendahara per item."
+      properties:
+        id: { type: integer }
+        nop: { type: string, nullable: true }
+        year: { type: integer, nullable: true }
+        amount_claimed: { type: number }
+        bill_total: { type: number, nullable: true }
+        status: { type: string, enum: [pending, approved, rejected] }
+        status_label: { type: string }
+        review_note: { type: string, nullable: true }
+    PbbDepositBatch:
+      type: object
+      description: "Slip setoran RT/kolektor. Status berasal dari agregasi item (pending/sebagian/disetujui/ditolak)."
+      properties:
+        id: { type: integer }
+        title: { type: string, example: "Setoran RT 03" }
+        total_amount: { type: number }
+        item_count: { type: integer }
+        status: { type: string, enum: [pending, partially_approved, approved, rejected] }
+        status_label: { type: string, example: "Menunggu ACC bendahara" }
+        note: { type: string, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PbbDepositItem' }

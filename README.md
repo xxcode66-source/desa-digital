@@ -6,13 +6,16 @@ Laravel** dengan panel operator/admin. Prinsip inti & aturan fase (Fase 0–6,
 RBAC via Policy, audit log immutabel) dijelaskan lengkap di
 [`PEMBANGUNAN.md`](PEMBANGUNAN.md) — baca file itu terlebih dahulu.
 
-> Status: **Fase 0 (Setup), Fase 1 (Auth & Verifikasi), Fase 2 (Surat / E-Layanan), &
-> Fase 3 (Pengaduan) selesai.**
+> Status: **Fase 0 (Setup), Fase 1 (Auth & Verifikasi), Fase 2 (Surat / E-Layanan),
+> Fase 3 (Pengaduan), & Fase 4 (PBB) selesai.**
 > Backend buildable + panel Filament (verifikasi warga + antrean surat dinamis + antrean
-> pengaduan), Android menghasilkan APK (onboarding, registrasi NIK, PIN/biometrik, wizard
-> surat dari skema, lacak status & perbaikan, formulir pengaduan + foto + lacak & balasan),
+> pengaduan + administrasi PBB: impor database, verifikasi klaim, ACC setoran sebagian),
+> Android menghasilkan APK (onboarding, registrasi NIK, PIN/biometrik, wizard surat dari
+> skema, lacak status & perbaikan, formulir pengaduan + foto + lacak & balasan, cek NOP,
+> klaim kepemilikan + foto, "NOP saya" & tunggakan, slip setoran RT/kolektor),
 > CI, ERD, API spec, & panduan desain.
 > Registrasi **tanpa OTP/SMS berbayar** — verifikasi identitas cukup oleh operator desa.
+> **Tidak ada pembayaran di aplikasi** — status `lunas` PBB hanya verifikasi internal desa.
 
 ## Struktur
 
@@ -123,12 +126,48 @@ desa-digital/
 - Daftar laporan milik warga (lacak badge status), detail + kronologi (perubahan status &
   balasan petugas), kolom balasan selama laporan terbuka. Entri dari Beranda ("Pengaduan").
 
+## Fase 4 yang sudah nyata (PBB / NPD)
+
+> **Prinsip: tanpa transaksi uang di aplikasi.** ACC/`lunas` adalah pencatatan verifikasi
+> internal desa (bukti setoran dari RT/kolektor dinilai bendahara), **bukan** bukti pelunasan
+> resmi — label ini tampil di UI & di `disclaimer` API cek NOP.
+
+### Backend
+- Tabel `pbb_objects`, `pbb_bills`, `pbb_claims`, `pbb_deposit_batches`, `pbb_deposit_items`,
+  `pbb_import_logs` (semua ber-`village_id`; NOP unik per desa, disimpan 18 digit murni).
+- Mesin status `PbbStatus`: tagihan `belum_bayar → disetor_pending → lunas` (transisi dijaga,
+  `lunas` final), klaim & item setoran `pending/approved/rejected`, batch teragregasi
+  (`pending/partially_approved/approved/rejected`). + penyamaran nama WP untuk cek NOP.
+- **Impor CSV/Excel database PBB** (`PbbImportService`): idempoten (upsert objek per NOP,
+  tagihan per tahun — tak menurunkan status), alias header longgar, log hasil
+  (`pbb_import_logs`: created/updated/skipped), tersimpan di disk privat. **ACC sebagian per
+  item** (`PbbDepositService`) — bendahara menyetujui/menolak tiap tagihan dalam slip; tolak
+  wajib alasan; semua ter-audit.
+- API warga: cek NOP publik (nama disamarkan + throttle `pbb_nop_check`), klaim kepemilikan
+  (multipart + foto bukti SPPT/surat tanah), "NOP saya" + tunggakan, riwayat klaim, unduh bukti
+  (disk privat). API kolektor: tagihan lingkup RT (`scope_rt` dari pivot role), ajukan slip
+  setoran (throttle `pbb_deposit_submit`), riwayat setoran. RBAC via `PbbClaimPolicy` /
+  `PbbDepositBatchPolicy`.
+- **155 test phpunit hijau** (unit `PbbStatus`, service impor & alur setoran ACC-sebagian,
+  policy, API cek-Nop/klaim/setoran + throttle + penyamaran, smoke panel Filament).
+- Filament: `PbbObjectResource` (list objek + impor CSV + detail tagihan), `PbbClaimResource`
+  (verifikasi klaim + lihat bukti), `PbbDepositBatchResource` & `PbbDepositItemResource`
+  (ACC sebagian per item oleh bendahara), widget dashboard `PbbStatsWidget` (realisasi tahun
+  berjalan vs target, uang "ditahan" belum di-ACC, setoran menunggu > N hari).
+
+### Android
+- Modul `feature/pbb`: hub menu PBB → **Cek NOP** (nama disamarkan + disclaimer), **NOP Saya**
+  (daftar + detail tunggakan), **Ajukan Klaim** (NOP + foto bukti via photo picker), dan
+  **Setoran** untuk RT/kolektor (pilih tagihan lingkup RT, lampar foto slip, pantau status).
+- Rupiah & status dilokalkan; pesan error teknis diterjemahkan ke bahasa warga. Entri Beranda
+  ("PBB") — label netral, tanpa kata "bayar" karena tak ada pembayaran in-app.
+
 ## Reference fase berikutnya (JANGAN dibangun sekarang)
 Stub lama fitur yang belum dibangun dipindah ke folder *reference* agar aturan
 satu-fase-per-sesi terjaga; stub yang sudah diimplementasikan dihapus saat fase-nya selesai
-(Surat/Fase 2 & Pengaduan/Fase 3 sudah dihapus):
-- `backend/reference-future-phases/` → PBB (Fase 4), UMKM (Fase 5).
-- `android-app/reference-future-phases/` → stub layar fitur yang sama.
+(Surat/Fase 2, Pengaduan/Fase 3, & PBB/Fase 4 sudah dihapus):
+- `backend/reference-future-phases/` → UMKM (Fase 5).
+- `android-app/reference-future-phases/` → stub layar UMKM (Fase 5).
 
 ## Cara build
 

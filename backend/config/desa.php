@@ -12,6 +12,8 @@ return [
         'letter_verify' => (int) env('DESA_THROTTLE_LETTER_VERIFY', 30),
         'complaint_submit' => (int) env('DESA_THROTTLE_COMPLAINT_SUBMIT', 10),
         'complaint_browse' => (int) env('DESA_THROTTLE_COMPLAINT_BROWSE', 30),
+        'pbb_nop_check' => (int) env('DESA_THROTTLE_PBB_NOP_CHECK', 10),
+        'pbb_deposit_submit' => (int) env('DESA_THROTTLE_PBB_DEPOSIT_SUBMIT', 12),
     ],
 
     // Modul Surat (Fase 2, PEMBANGUNAN.md 4.2).
@@ -36,5 +38,15 @@ return [
             'saluran_air' => 'Saluran / Drainase',
             'lainnya' => 'Lainnya',
         ],
+    ],
+
+    // Modul PBB (Fase 4, PEMBANGUNAN.md 4.3). TANPA pembayaran in-app: setoran/ACC hanya
+    // pencatatan internal desa, bukan bukti pelunasan resmi.
+    'pbb' => [
+        'evidence_max_kb' => (int) env('DESA_PBB_MAX_EVIDENCE_KB', 3072), // foto SPPT/kuitansi (±3 MB)
+        'allowed_mime' => ['image/jpeg', 'image/png', 'image/webp'], // bukti = foto, bukan PDF
+        'pending_reminder_days' => (int) env('DESA_PBB_PENDING_REMINDER_DAYS', 7), // setoran pending > N hari -> pengingat
+        // Lebar kolom nop di DB; input cek NOP dibersihkan & dibatasi sebatas ini.
+        'nop_max_len' => 18,
     ],
 ];

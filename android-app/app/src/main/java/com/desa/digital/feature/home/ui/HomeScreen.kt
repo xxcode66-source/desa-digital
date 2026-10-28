@@ -19,6 +19,7 @@ fun HomeScreen(
     onOpenProfile: () -> Unit,
     onOpenLetters: () -> Unit = {},
     onOpenComplaints: () -> Unit = {},
+    onOpenPbb: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -56,7 +57,7 @@ fun HomeScreen(
 
             val menus = listOf(
                 "Ajukan Surat" to true,
-                "Cek & Bayar PBB" to false,
+                "PBB / Cek NOP" to true,
                 "Pasar UMKM" to false,
                 "Pengaduan" to true,
             )
@@ -65,6 +66,7 @@ fun HomeScreen(
                     onClick = {
                         when (label) {
                             "Ajukan Surat" -> onOpenLetters()
+                            "PBB / Cek NOP" -> onOpenPbb()
                             "Pengaduan" -> onOpenComplaints()
                         }
                     },
